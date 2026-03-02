@@ -429,33 +429,57 @@
     letter-spacing: 1px;
   }
 
+  /* フロー図レイアウト */
   .flow-horizontal {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+  /* 横並び行（原水槽→前処理→凝集沈殿槽） */
+  .fh-row {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 0;
   }
-  .fh-node {
-    background: var(--surface2);
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-    padding: 12px 20px;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text);
-    text-align: center;
-    min-width: 110px;
+  /* 分岐コンテナ */
+  .fh-branch {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    margin-left: 0;
   }
-  .fh-node.special {
-    border-color: var(--warn);
-    background: rgba(255,107,53,0.08);
+  /* 分岐の縦線（凝集沈殿槽から下に伸びる） */
+  .fh-branch-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
   }
+  .fh-branch-line::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -1px;
+    width: 2px;
+    height: 100%;
+    background: var(--accent);
+  }
+  /* 各分岐列 */
+  .fh-branch-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  /* 横矢印（右向き） */
   .fh-arrow {
     width: 30px;
     height: 2px;
     background: var(--accent);
     position: relative;
     flex-shrink: 0;
+    align-self: center;
   }
   .fh-arrow::after {
     content: '';
@@ -466,6 +490,40 @@
     border-top: 4px solid transparent;
     border-bottom: 4px solid transparent;
     border-left: 6px solid var(--accent);
+  }
+  /* 縦矢印（下向き） */
+  .fh-arrow-down {
+    width: 2px;
+    height: 24px;
+    background: var(--accent);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .fh-arrow-down::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 6px solid var(--accent);
+  }
+  .fh-node {
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    text-align: center;
+    min-width: 110px;
+    white-space: nowrap;
+  }
+  .fh-node.special {
+    border-color: var(--warn);
+    background: rgba(255,107,53,0.08);
   }
 
   .notes-section {
@@ -537,6 +595,18 @@
     font-weight: 500;
   }
   .data-table td:last-child { color: var(--text); }
+
+  .fh-branch {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    margin-top: 0;
+  }
+  .fh-branch-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
 
   .fh-node.main-node {
     border-color: var(--accent2);
@@ -791,23 +861,23 @@
 <div class="container" id="main-container">
   <!-- Sidebar -->
   <nav class="sidebar">
-    <div class="step-nav-item active" data-step="1">
+    <div class="step-nav-item active" data-step="1" onclick="goStep(1)">
       <div class="step-num">1</div>
       <div class="step-label">基本情報</div>
     </div>
-    <div class="step-nav-item" data-step="2">
+    <div class="step-nav-item" data-step="2" onclick="goStep(2)">
       <div class="step-num">2</div>
       <div class="step-label">水質情報</div>
     </div>
-    <div class="step-nav-item" data-step="3">
+    <div class="step-nav-item" data-step="3" onclick="goStep(3)">
       <div class="step-num">3</div>
       <div class="step-label">放流先・規制</div>
     </div>
-    <div class="step-nav-item" data-step="4">
+    <div class="step-nav-item" data-step="4" onclick="goStep(4)">
       <div class="step-num">4</div>
       <div class="step-label">既存設備</div>
     </div>
-    <div class="step-nav-item" data-step="5">
+    <div class="step-nav-item" data-step="5" onclick="goStep(5)">
       <div class="step-num">5</div>
       <div class="step-label">現場・施工条件</div>
     </div>
@@ -825,7 +895,7 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">顧客名 <span class="required">必須</span></div>
+        <div class="field-label">顧客名</div>
         <input type="text" id="customer_name" placeholder="例: 株式会社〇〇製作所" oninput="updateData('customer_name', this.value)">
       </div>
 
@@ -843,7 +913,7 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">導入区分 <span class="required">必須</span></div>
+        <div class="field-label">導入区分</div>
         <div class="radio-grid" id="install_type" style="grid-template-columns:repeat(2,1fr);">
           <div class="radio-item" onclick="selectRadio('install_type', '新規導入', this)">🆕 新規導入</div>
           <div class="radio-item" onclick="selectRadio('install_type', '設備更新', this)">🔄 設備更新</div>
@@ -879,7 +949,7 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">業種・業態 <span class="required">必須</span></div>
+        <div class="field-label">業種・業態</div>
         <select id="industry" onchange="onIndustryChange(this.value)">
           <option value="">選択してください</option>
           <optgroup label="金属・加工">
@@ -908,7 +978,7 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">排水の種類・内容 <span class="required">必須</span></div>
+        <div class="field-label">排水の種類・内容</div>
         <select id="wastewater_type_select" onchange="selectWastewaterType(this.value)" style="margin-bottom:8px; width:100%;">
           <option value="">業種を選択すると候補が表示されます</option>
         </select>
@@ -916,7 +986,7 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">1日の排水量 <span class="required">必須</span>
+        <div class="field-label">1日の排水量
           <div class="tooltip-wrap">
             <span class="tooltip-icon">?</span>
             <div class="tooltip-text">バッチ処理の総排水量（㎥/日）を入力してください。1バッチあたりの量×回数で概算可</div>
@@ -937,7 +1007,7 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">1日のバッチ回数 <span class="required">必須</span></div>
+        <div class="field-label">1日のバッチ回数</div>
         <div class="radio-grid" id="batch_count">
           <div class="radio-item" onclick="selectRadio('batch_count', '1回', this)">1回</div>
           <div class="radio-item" onclick="selectRadio('batch_count', '2〜3回', this)">2〜3回</div>
@@ -947,7 +1017,7 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">排水処理装置の容量 <span class="required">必須</span></div>
+        <div class="field-label">排水処理装置の容量</div>
         <div class="radio-grid" id="tank_capacity" style="grid-template-columns:repeat(3,1fr);">
           <div class="radio-item" onclick="selectRadio('tank_capacity', '200L', this)">200L</div>
           <div class="radio-item" onclick="selectRadio('tank_capacity', '500L', this)">500L</div>
@@ -992,7 +1062,7 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">原水のpH範囲 <span class="required">必須</span></div>
+        <div class="field-label">原水のpH範囲</div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
           <div class="input-with-unit">
             <input type="number" id="ph_min" placeholder="最小値 例:2" min="0" max="14" step="0.1" oninput="updateData('ph_min', this.value); updateFlowPreview()">
@@ -1006,7 +1076,7 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">含まれる重金属 <span class="required">必須</span>（複数選択可）</div>
+        <div class="field-label">含まれる重金属（複数選択可）</div>
         <div class="check-grid" id="metals">
           <div class="check-item" onclick="toggleCheck('metals', 'クロム(Cr)', this)"><div class="check-box"></div>クロム (Cr)</div>
           <div class="check-item" onclick="toggleCheck('metals', 'ニッケル(Ni)', this)"><div class="check-box"></div>ニッケル (Ni)</div>
@@ -1083,7 +1153,7 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">放流先 <span class="required">必須</span></div>
+        <div class="field-label">放流先</div>
         <div class="radio-grid" id="discharge_dest">
           <div class="radio-item" onclick="selectRadio('discharge_dest', '公共下水道', this); updateFlowPreview()">公共下水道</div>
           <div class="radio-item" onclick="selectRadio('discharge_dest', '河川・湖沼', this); updateFlowPreview()">河川・湖沼</div>
@@ -1262,7 +1332,7 @@
 
       <div class="nav-buttons">
         <button class="btn btn-secondary" onclick="goStep(4)">← 戻る</button>
-        <button class="btn btn-generate" onclick="generateResult()">📋 フロー図を生成する</button>
+        <button class="btn btn-generate" onclick="generateResult()">📋 ヒアリングシートを作成</button>
       </div>
     </div>
   </div>
@@ -1279,12 +1349,23 @@
       <div class="flow-node" id="fn-chromium" style="display:none;">六価Cr還元槽<div class="node-label">Cr⁶⁺→Cr³⁺（前処理）</div></div>
       <div class="flow-arrow" id="fa-chromium" style="display:none;"></div>
       <div class="flow-node active-node" id="fn-coag-settle">凝集沈殿槽<div class="node-label">pH調整→凝集→沈殿</div></div>
-      <div class="flow-arrow active-arrow" id="fa2"></div>
-      <div class="flow-node" id="fn-fluorine" style="display:none;">フッ素処理槽<div class="node-label">Ca添加・沈殿</div></div>
-      <div class="flow-arrow" id="fa-fluorine" style="display:none;"></div>
-      <div class="flow-node active-node" id="fn-filter">ろ過スタンド<div class="node-label">固液分離</div></div>
-      <div class="flow-arrow active-arrow" id="fa3"></div>
-      <div class="flow-node active-node" id="fn-discharge">処理水放流<div class="node-label">入力待ち</div></div>
+      <!-- 分岐 -->
+      <div style="display:flex; align-items:flex-start; gap:8px; margin-top:0;">
+        <!-- 左：上澄み直接放流 -->
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          <div class="flow-arrow active-arrow"></div>
+          <div class="flow-node active-node" style="font-size:11px; min-width:100px;">上澄み液<div class="node-label">直接放流</div></div>
+        </div>
+        <!-- 右：ろ過スタンド経由 -->
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          <div class="flow-arrow active-arrow"></div>
+          <div class="flow-node" id="fn-fluorine" style="display:none;">フッ素処理槽<div class="node-label">Ca添加・沈殿</div></div>
+          <div class="flow-arrow" id="fa-fluorine" style="display:none;"></div>
+          <div class="flow-node active-node" id="fn-filter" style="min-width:100px;">ろ過スタンド<div class="node-label">スラッジ→ろ過</div></div>
+          <div class="flow-arrow active-arrow"></div>
+          <div class="flow-node active-node" style="font-size:11px; min-width:100px;">ろ過水<div class="node-label">放流</div></div>
+        </div>
+      </div>
     </div>
 
     <div class="data-summary" id="data-summary">
@@ -1606,22 +1687,61 @@ function generateResult() {
   const subEl = document.getElementById('result-subinfo');
   if (subEl) subEl.textContent = subInfo;
 
-  // ---- フロー図（バッチ式・1槽構成）----
-  const nodes = [];
-  nodes.push({label: '原水槽', sub: data.raw_tank_size ? data.raw_tank_size + 'm³' : '', special: false});
-  if (hasCyanide) nodes.push({label: 'シアン酸化槽', sub: '前処理（CN除去）', special: true});
-  if (hasChromium6) nodes.push({label: '六価Cr還元槽', sub: '前処理（Cr⁶⁺→Cr³⁺）', special: true});
-  nodes.push({label: '凝集沈殿槽', sub: (data.tank_capacity ? data.tank_capacity + ' / ' : '') + 'pH調整 → 凝集 → 沈殿', special: false, main: true});
-  if (hasFluorine) nodes.push({label: 'フッ素処理槽', sub: 'Ca添加・沈殿', special: false});
-  nodes.push({label: 'ろ過スタンド', sub: '固液分離', special: false});
-  nodes.push({label: '処理水', sub: data.discharge_dest ? data.discharge_dest + 'へ放流' : '放流', special: false});
+  // ---- フロー図（バッチ式・分岐構造）----
+  const destLabel = data.discharge_dest ? data.discharge_dest + 'へ' : '放流';
+  const tankLabel = (data.tank_capacity ? data.tank_capacity + ' / ' : '') + 'pH調整→凝集→沈殿';
+  const fluorineHTML = hasFluorine
+    ? `<div class="fh-arrow"></div><div class="fh-node">フッ素処理槽<br><small>Ca添加・沈殿</small></div>`
+    : '';
 
-  let flowHTML = '';
-  nodes.forEach((n, i) => {
-    const cls = ['fh-node', n.special ? 'special' : '', n.main ? 'main-node' : ''].filter(Boolean).join(' ');
-    flowHTML += `<div class="${cls}">${n.label}${n.sub ? '<br><small>' + n.sub + '</small>' : ''}</div>`;
-    if (i < nodes.length - 1) flowHTML += `<div class="fh-arrow"></div>`;
-  });
+  // 構造：
+  // 原水槽 → [前処理] → 凝集沈殿槽 → ろ過スタンド → ろ過水
+  //                          ↓
+  //                       上澄み液（直接放流）
+  // ※ 凝集沈殿槽にposition:relativeで↓を中央から生やす
+
+  const preArrows = (hasCyanide ? `<div class="fh-arrow"></div><div class="fh-node special">シアン酸化槽<br><small>CN除去</small></div>` : '')
+    + (hasChromium6 ? `<div class="fh-arrow"></div><div class="fh-node special">六価Cr還元槽<br><small>Cr⁶⁺→Cr³⁺</small></div>` : '');
+
+  const flowHTML = `
+  <div style="display:inline-flex; flex-direction:column; align-items:flex-start;">
+
+    <!-- 主線：横並び -->
+    <div style="display:flex; align-items:center;">
+      <div class="fh-node">${data.raw_tank_size ? '原水槽<br><small>' + data.raw_tank_size + 'm³</small>' : '原水槽'}</div>
+      ${preArrows}
+      <div class="fh-arrow"></div>
+      <div class="fh-node main-node" style="position:relative;">
+        凝集沈殿槽<br><small>${tankLabel}</small>
+        <!-- 下向き矢印を中央から生やす -->
+        <div style="position:absolute; bottom:-26px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center;">
+          <div class="fh-arrow-down"></div>
+        </div>
+      </div>
+      ${fluorineHTML}
+      <div class="fh-arrow"></div>
+      <div class="fh-node">ろ過スタンド<br><small>スラッジ→ろ過${data.filter_branches ? '（' + data.filter_branches + '）' : ''}</small></div>
+      <div class="fh-arrow"></div>
+      <div class="fh-node">ろ過水<br><small>放流（${destLabel}）</small></div>
+    </div>
+
+    <!-- 上澄み：凝集沈殿槽の中央真下 -->
+    <div style="display:flex; align-items:flex-start;">
+      <!-- 原水槽＋前処理分のスペーサー -->
+      <div style="visibility:hidden; display:flex; align-items:center;">
+        <div class="fh-node">原水槽</div>
+        ${preArrows ? preArrows + '<div class="fh-arrow"></div>' : ''}
+        <div class="fh-arrow"></div>
+      </div>
+      <!-- 凝集沈殿槽の幅に合わせて中央に上澄みノード -->
+      <div style="display:flex; flex-direction:column; align-items:center; min-width:130px;">
+        <div style="height:26px;"></div><!-- fh-arrow-downの高さ分スペース -->
+        <div class="fh-node">上澄み液<br><small>直接放流（${destLabel}）</small></div>
+      </div>
+    </div>
+
+  </div>`;
+
   document.getElementById('result-flow').innerHTML = flowHTML;
 
   // ---- データテーブル ----
