@@ -306,6 +306,122 @@
     font-weight: 700;
     padding: 13px 36px;
   }
+  .btn-danger {
+    background: #c0392b;
+    color: #fff;
+  }
+  .btn-danger:hover { background: #e74c3c; }
+
+  /* Reset Button (Header) */
+  .btn-reset {
+    margin-left: auto;
+    padding: 6px 14px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text3);
+    font-size: 12px;
+    font-family: 'Noto Sans JP', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-reset:hover { border-color: var(--warn); color: var(--warn); }
+
+  /* Confirmation Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(3px);
+  }
+  .modal-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 36px 40px;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    animation: modal-in 0.18s ease;
+  }
+  @keyframes modal-in {
+    from { transform: scale(0.92); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+  }
+  .modal-icon { font-size: 36px; margin-bottom: 16px; }
+  .modal-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .modal-desc {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.7;
+    margin-bottom: 28px;
+  }
+  .modal-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  /* Draft Resume Banner */
+  .draft-banner {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 32px;
+    background: rgba(0,153,255,0.08);
+    border-bottom: 1px solid rgba(0,153,255,0.25);
+    font-size: 13px;
+  }
+  .draft-banner-text { flex: 1; line-height: 1.5; }
+  .draft-banner-text strong { color: var(--accent2); }
+  .draft-banner-time { color: var(--text3); margin-left: 6px; font-size: 12px; }
+  .btn-resume {
+    padding: 6px 16px;
+    background: var(--accent2);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 500;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+  }
+  .btn-resume:hover { opacity: 0.82; }
+  .btn-discard {
+    padding: 6px 14px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text3);
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .btn-discard:hover { border-color: var(--text3); color: var(--text2); }
+
+  /* Save Indicator */
+  .save-indicator {
+    font-size: 11px;
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    opacity: 0;
+    transition: opacity 0.4s;
+    white-space: nowrap;
+  }
+  .save-indicator.visible { opacity: 1; }
 
   /* Preview Panel */
   .preview-panel {
@@ -852,10 +968,23 @@
   <span class="logo">WW-SURVEY</span>
   <span style="color:var(--border)">|</span>
   <h1>排水処理 ヒアリングウィザード</h1>
-  <span style="margin-left:auto; font-size:12px; color:var(--text3); font-family:'Space Mono',monospace;" id="step-counter">STEP 1 / 5</span>
+  <button class="btn-reset" onclick="confirmReset()">🗑 初期化</button>
+  <span class="save-indicator" id="save-indicator">✓ 保存済み</span>
+  <span style="font-size:12px; color:var(--text3); font-family:'Space Mono',monospace;" id="step-counter">STEP 1 / 5</span>
 </header>
 <div class="progress-bar">
   <div class="progress-fill" id="progress-fill" style="width:20%"></div>
+</div>
+
+<!-- Draft Resume Banner -->
+<div id="draft-banner" class="draft-banner">
+  <span style="font-size:18px; flex-shrink:0;">📂</span>
+  <div class="draft-banner-text">
+    <strong>前回の入力内容があります</strong>
+    <span class="draft-banner-time" id="draft-banner-time"></span>
+  </div>
+  <button class="btn-resume" onclick="resumeDraft()">▶ 再開する</button>
+  <button class="btn-discard" onclick="discardDraft()">破棄する</button>
 </div>
 
 <div class="container" id="main-container">
@@ -1454,6 +1583,19 @@
 
 </div>
 
+<!-- Reset Confirmation Modal -->
+<div id="reset-modal" class="modal-overlay" onclick="closeResetModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-icon">🗑</div>
+    <div class="modal-title">フォームを初期化しますか？</div>
+    <div class="modal-desc">入力中のすべての内容が削除されます。<br>この操作は取り消せません。</div>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closeResetModal()">キャンセル</button>
+      <button class="btn btn-danger" onclick="executeReset()">初期化する</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===== State =====
 const data = {
@@ -1474,6 +1616,205 @@ const data = {
 };
 
 let currentStep = 1;
+let _restoring = false; // 復元中はsaveToLocalStorageをスキップ
+
+// ===== LocalStorage Auto-Save =====
+const LS_KEY = 'ww-draft';
+
+function saveToLocalStorage() {
+  if (_restoring) return;
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({ data, step: currentStep, savedAt: Date.now() }));
+    flashSaveIndicator();
+  } catch(e) { /* localStorage 使用不可 or 容量超過 */ }
+}
+
+function clearLocalStorage() {
+  try { localStorage.removeItem(LS_KEY); } catch(e) {}
+}
+
+function flashSaveIndicator() {
+  const el = document.getElementById('save-indicator');
+  if (!el) return;
+  el.classList.add('visible');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('visible'), 2000);
+}
+
+function loadFromLocalStorage() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    const payload = JSON.parse(raw);
+    if (!payload || !payload.data) return;
+    const banner = document.getElementById('draft-banner');
+    const timeEl = document.getElementById('draft-banner-time');
+    if (timeEl) timeEl.textContent = payload.savedAt ? '（' + _elapsedLabel(payload.savedAt) + '）' : '';
+    if (banner) { banner.style.display = 'flex'; banner._payload = payload; }
+  } catch(e) {}
+}
+
+function _elapsedLabel(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60)    return '数秒前';
+  if (s < 3600)  return Math.floor(s / 60) + '分前';
+  if (s < 86400) return Math.floor(s / 3600) + '時間前';
+  return Math.floor(s / 86400) + '日前';
+}
+
+function resumeDraft() {
+  const banner = document.getElementById('draft-banner');
+  const payload = banner && banner._payload;
+  if (!payload) return;
+  _restoring = true;
+  Object.assign(data, payload.data);
+  _restoreUI(payload.step || 1);
+  _restoring = false;
+  banner.style.display = 'none';
+  saveToLocalStorage(); // 復元後に一度保存して最終保存時刻を更新
+}
+
+function discardDraft() {
+  clearLocalStorage();
+  document.getElementById('draft-banner').style.display = 'none';
+}
+
+// UI全体を data オブジェクトの値から再構築する
+function _restoreUI(targetStep) {
+  // ── テキスト・数値・日付系 ──
+  ['customer_name','desired_delivery','staff_email','delivery_city',
+   'wastewater_type','daily_volume','working_days','raw_tank_size',
+   'space_area','pipe_distance','pipe_step','notes','sensor_other_note'
+  ].forEach(key => {
+    const el = document.getElementById(key);
+    if (el && data[key] != null) el.value = data[key];
+  });
+
+  // ── セレクト（都道府県など） ──
+  ['delivery_pref','prefecture'].forEach(key => {
+    const el = document.getElementById(key);
+    if (el && data[key]) el.value = data[key];
+  });
+
+  // ── 業種 → 排水候補リストを更新してから選択値を復元 ──
+  if (data.industry) {
+    const indEl = document.getElementById('industry');
+    if (indEl) indEl.value = data.industry;
+    updateWastewaterOptions(data.industry);
+    if (data.wastewater_type) {
+      const wtSel = document.getElementById('wastewater_type_select');
+      if (wtSel) Array.from(wtSel.options).forEach(o => { if (o.value === data.wastewater_type) wtSel.value = o.value; });
+      const wtText = document.getElementById('wastewater_type');
+      if (wtText) wtText.value = data.wastewater_type;
+    }
+  }
+
+  // ── ラジオボタン（onclick属性から値を照合） ──
+  ['install_type','batch_count','tank_capacity','filter_branches','powder_feeder',
+   'discharge_dest','regulation_status','raw_tank','power_status',
+   'location_type','slope_status'
+  ].forEach(key => {
+    if (!data[key]) return;
+    const container = document.getElementById(key);
+    if (!container) return;
+    container.querySelectorAll('.radio-item').forEach(el => {
+      const m = (el.getAttribute('onclick') || '').match(/selectRadio\([^,]+,\s*'([^']+)'/);
+      if (m && m[1] === data[key]) el.classList.add('selected');
+    });
+  });
+
+  // ── チェックボックス（onclick属性から値を照合） ──
+  ['metals','hazardous','other_contam','chemicals','level_sensors','carry_in','access'
+  ].forEach(key => {
+    const vals = data[key];
+    if (!vals || !vals.length) return;
+    const container = document.getElementById(key);
+    if (!container) return;
+    container.querySelectorAll('.check-item').forEach(el => {
+      const m = (el.getAttribute('onclick') || '').match(/toggleCheck\([^,]+,\s*'([^']+)'/);
+      if (m && vals.includes(m[1])) {
+        el.classList.add('selected');
+        const box = el.querySelector('.check-box');
+        if (box) box.textContent = '✓';
+      }
+    });
+  });
+
+  // ── 薬品「その他」 ──
+  if (data.chem_other_count) {
+    const el = document.getElementById('chem_other_item');
+    if (el && !el.classList.contains('selected')) {
+      el.classList.add('selected');
+      const box = el.querySelector('.check-box');
+      if (box) box.textContent = '✓';
+      document.getElementById('chem_other_wrap').style.display = 'block';
+      document.getElementById('chem_other_count').value = data.chem_other_count;
+    }
+  }
+
+  // ── センサー「その他」 ──
+  if (data.sensor_other_count || data.sensor_other_note) {
+    const el = document.getElementById('sensor-other-item');
+    if (el && !el.classList.contains('selected')) {
+      el.classList.add('selected');
+      const box = el.querySelector('.check-box');
+      if (box) box.textContent = '✓';
+      document.getElementById('sensor-other-wrap').style.display = 'block';
+      if (data.sensor_other_count) document.getElementById('sensor_other_count').value = data.sensor_other_count;
+      if (data.sensor_other_note) document.getElementById('sensor_other_note').value = data.sensor_other_note;
+    }
+  }
+
+  // ── 追加ポンプ行を再構築 ──
+  const savedPumps = (data.extra_pumps || []).filter(Boolean);
+  data.extra_pumps = [];
+  pumpRowCount = 0;
+  const emptyRow = document.getElementById('extra-pump-empty');
+  if (emptyRow) emptyRow.remove();
+  savedPumps.forEach(pump => {
+    const idx = pumpRowCount++;
+    data.extra_pumps.push({ ...pump });
+    const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    const tr = document.createElement('tr');
+    tr.id = 'pump-row-' + idx;
+    tr.style.borderBottom = '1px solid var(--border)';
+    tr.innerHTML = `
+      <td style="padding:4px;"><input type="text" placeholder="例: 移送ポンプ" style="width:100%;" oninput="updateExtraPump(${idx},'name',this.value)" value="${esc(pump.name)}"></td>
+      <td style="padding:4px;"><input type="number" min="0" placeholder="1" style="width:52px;text-align:center;" oninput="updateExtraPump(${idx},'count',this.value)" value="${esc(pump.count)}"></td>
+      <td style="padding:4px;"><input type="number" min="0" step="0.1" placeholder="0.1" style="width:72px;text-align:center;" oninput="updateExtraPump(${idx},'lph',this.value)" value="${esc(pump.lph)}"></td>
+      <td style="padding:4px;"><input type="number" min="0" step="0.1" placeholder="—" style="width:72px;text-align:center;" oninput="updateExtraPump(${idx},'amp',this.value)" value="${esc(pump.amp)}"></td>
+      <td style="padding:4px;text-align:center;"><button type="button" onclick="removePumpRow(${idx})" style="background:none;border:none;color:var(--warn);cursor:pointer;font-size:16px;">✕</button></td>`;
+    document.getElementById('extra-pump-rows').appendChild(tr);
+  });
+  if (savedPumps.length === 0) {
+    const empty = document.createElement('tr');
+    empty.id = 'extra-pump-empty';
+    empty.style.color = 'var(--text3)'; empty.style.fontSize = '12px';
+    empty.innerHTML = '<td colspan="5" style="padding:12px 4px;text-align:center;">「＋ポンプを追加」から入力してください</td>';
+    document.getElementById('extra-pump-rows').appendChild(empty);
+  }
+
+  // ── 再計算・プレビュー更新 ──
+  calcPumps();
+  calcSensors();
+  updateFlowPreview();
+  updateSummary();
+
+  // ── ステップを復元 ──
+  if (targetStep > 1) {
+    document.querySelectorAll('.step-panel').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.step-nav-item').forEach(el => {
+      const s = parseInt(el.dataset.step);
+      if (s < targetStep) el.classList.add('done');
+      el.classList.remove('active');
+    });
+    currentStep = targetStep;
+    document.getElementById('step' + targetStep).classList.add('active');
+    document.querySelector('[data-step="' + targetStep + '"]').classList.add('active');
+    document.getElementById('step-counter').textContent = 'STEP ' + targetStep + ' / 5';
+    document.getElementById('progress-fill').style.width = (targetStep * 20) + '%';
+  }
+}
 
 // ===== Helpers =====
 function updateData(key, value) {
@@ -1589,6 +1930,7 @@ function updateSummary() {
       <span class="data-val">${r[1]}</span>
     </div>`).join('');
   document.getElementById('data-summary').innerHTML = html;
+  saveToLocalStorage();
 }
 
 function getIndustryLabel(v) {
@@ -1643,6 +1985,7 @@ function addPumpRow() {
     <td style="padding:4px; text-align:center;"><button type="button" onclick="removePumpRow(${idx})" style="background:none; border:none; color:var(--warn); cursor:pointer; font-size:16px;">✕</button></td>
   `;
   document.getElementById('extra-pump-rows').appendChild(tr);
+  saveToLocalStorage();
 }
 function removePumpRow(idx) {
   const tr = document.getElementById('pump-row-' + idx);
@@ -1949,6 +2292,88 @@ function backToForm() {
   document.getElementById('result-page').classList.remove('show');
 }
 
+// ===== Reset =====
+function confirmReset() {
+  document.getElementById('reset-modal').style.display = 'flex';
+}
+
+function closeResetModal() {
+  document.getElementById('reset-modal').style.display = 'none';
+}
+
+function executeReset() {
+  // dataオブジェクトをリセット
+  Object.assign(data, {
+    customer_name: '', desired_delivery: '', staff_email: '',
+    install_type: '', delivery_pref: '', delivery_city: '',
+    industry: '', wastewater_type: '', daily_volume: '', working_days: '', batch_count: '',
+    tank_capacity: '', filter_branches: '', powder_feeder: '',
+    chemicals: [], pump_count: 0, chem_other_count: '',
+    ph_min: '', ph_max: '',
+    metals: [], hazardous: [], other_contam: [],
+    discharge_dest: '', prefecture: '', regulation_status: '',
+    raw_tank: '', raw_tank_size: '', existing_equip: [], existing_equip_other: '',
+    existing_power_kw: '', power_status: '',
+    extra_pumps: [],
+    level_sensors: [], sensor_count: 0, sensor_other_count: '', sensor_other_note: '',
+    space_area: '', location_type: '', carry_in: [], access: [],
+    pipe_distance: '', pipe_step: '', slope_status: '', notes: ''
+  });
+
+  // テキスト・数値・日付・セレクト・テキストエリアをクリア
+  document.querySelectorAll('#main-container input, #main-container select, #main-container textarea').forEach(el => {
+    el.value = '';
+  });
+
+  // ラジオ・チェックボックスの選択状態をリセット
+  document.querySelectorAll('.radio-item.selected').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('.check-item.selected').forEach(el => {
+    el.classList.remove('selected');
+    const box = el.querySelector('.check-box');
+    if (box) box.textContent = '';
+  });
+
+  // 追加ポンプ行をリセット
+  document.getElementById('extra-pump-rows').innerHTML =
+    '<tr id="extra-pump-empty" style="color:var(--text3); font-size:12px;">' +
+    '<td colspan="5" style="padding:12px 4px; text-align:center;">「＋ポンプを追加」から入力してください</td></tr>';
+  pumpRowCount = 0;
+
+  // 動的に表示される要素を非表示に
+  document.getElementById('chem_other_wrap').style.display = 'none';
+  document.getElementById('pump-calc-result').style.display = 'none';
+  document.getElementById('sensor-other-wrap').style.display = 'none';
+  document.getElementById('sensor-count-result').style.display = 'none';
+
+  // 排水候補セレクトをリセット
+  document.getElementById('wastewater_type_select').innerHTML =
+    '<option value="">業種を選択すると候補が表示されます</option>';
+
+  // 結果ページが表示中なら元に戻す
+  document.getElementById('main-container').style.display = 'grid';
+  document.getElementById('result-page').classList.remove('show');
+
+  // ステップをリセットして STEP 1 へ
+  document.querySelectorAll('.step-panel').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.step-nav-item').forEach(el => el.classList.remove('done', 'active'));
+  currentStep = 1;
+  document.getElementById('step1').classList.add('active');
+  document.querySelector('[data-step="1"]').classList.add('active');
+  document.getElementById('step-counter').textContent = 'STEP 1 / 5';
+  document.getElementById('progress-fill').style.width = '20%';
+
+  updateFlowPreview();
+  updateSummary();
+  clearLocalStorage();
+  closeResetModal();
+}
+
+// ESCキーでモーダルを閉じる
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeResetModal();
+});
+
 // Init
 updateFlowPreview();
+loadFromLocalStorage();
 </script>
