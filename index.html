@@ -798,20 +798,16 @@
       min-height: 0;
     }
 
-    /* === ステップナビ: 常に画面上部に固定 ===
-       ページをスクロールしても ①〜⑤ が見え続ける。
-       5等分グリッドで全幅に広げ、横スクロール不要。          */
+    /* === ステップナビ: 通常フロー配置 ===
+       5等分グリッドで全幅に広げ、横スクロール不要。
+       sticky は iOS Safari で操作不能を引き起こすため使わない。 */
     .sidebar {
-      position: sticky;
-      top: 0;
-      z-index: 200;
       border-right: none;
       border-bottom: 1px solid var(--border);
       padding: 0;
       display: grid;
       grid-template-columns: repeat(5, 1fr);
       background: var(--bg);
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
     }
     .step-nav-item {
       display: flex;              /* 明示的に flex を指定 */
@@ -860,7 +856,12 @@
 
     /* チェックボックスグリッド: 2列固定 */
     .check-grid { grid-template-columns: 1fr 1fr !important; }
-    .radio-grid { grid-template-columns: 1fr 1fr !important; }
+    /* radio-grid は元々 display:flex のため grid-template-columns が効かない。
+       モバイルでは display:grid に上書きして 2列を実際に適用する。 */
+    .radio-grid {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+    }
 
     /* インラインの 2 カラムを縦積みに */
     .field-group > div[style*="grid-template-columns:1fr 1fr"] {
