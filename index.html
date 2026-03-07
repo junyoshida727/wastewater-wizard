@@ -2358,7 +2358,7 @@ function buildFlowSVG(d) {
     });
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="100%" style="display:block;max-width:100%;border-radius:6px;">${p.join('')}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="100%" style="display:block;max-width:100%;border-radius:6px;">${p.join('')}<\/svg>`;
 }
 
 // ===== Generate Result =====
@@ -2551,3 +2551,5 @@ document.addEventListener('keydown', e => {
 updateFlowPreview();
 loadFromLocalStorage();
 </script>
+</body>
+</html>
