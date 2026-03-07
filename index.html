@@ -27,8 +27,10 @@
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
+    min-height: 100svh; /* iOS Safari: アドレスバーを含まない実際の表示高さ */
     display: flex;
     flex-direction: column;
+    overflow-x: hidden;
   }
 
   /* Header */
@@ -84,6 +86,10 @@
     cursor: pointer;
     transition: background 0.2s;
     border-left: 3px solid transparent;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
   }
   .step-nav-item:hover { background: var(--surface); }
   .step-nav-item.active {
@@ -178,13 +184,11 @@
     width: 100%;
     background: var(--surface);
     border: 1px solid var(--border);
-    /* iOS Safariのフォームズーム防止（font-size 16px以上必須） */
-    font-size: 16px;
     border-radius: 6px;
     padding: 10px 14px;
     color: var(--text);
     font-family: 'Noto Sans JP', sans-serif;
-    font-size: 14px;
+    font-size: 16px; /* iOS Safari 自動ズーム防止: 16px 未満だとズームが発生する */
     transition: border-color 0.2s;
     outline: none;
     -webkit-appearance: none;
@@ -225,6 +229,8 @@
     font-size: 13px;
     user-select: none;
     -webkit-user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
   .check-item:hover { border-color: var(--text3); background: var(--surface2); }
   .check-item.selected {
@@ -264,6 +270,10 @@
     cursor: pointer;
     transition: all 0.2s;
     font-size: 13px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
   }
   .radio-item:hover { border-color: var(--text3); }
   .radio-item.selected {
@@ -288,6 +298,10 @@
     font-size: 14px;
     font-weight: 500;
     transition: all 0.2s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
   }
   .btn-primary {
     background: var(--accent);
@@ -533,16 +547,24 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 32px;
+    padding: 20px 24px 24px;
     margin-bottom: 24px;
+    overflow: hidden;
+  }
+  /* SVGフロー図を格納するdivは横スクロール可能に */
+  #result-flow {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 6px;
   }
   .flow-result-title {
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--text2);
-    margin-bottom: 24px;
+    margin-bottom: 14px;
     font-family: 'Space Mono', monospace;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
   }
 
   /* フロー図レイアウト */
@@ -751,52 +773,96 @@
     #result-page { grid-column: 2 / 3; }
   }
 
-  /* スマホ（〜600px）: 縦積みレイアウトに切り替え */
+  /* スマホ（〜600px）: モバイル最適化レイアウト */
   @media (max-width: 600px) {
-    header { padding: 14px 16px; }
-    header h1 { font-size: 13px; }
 
+    /* === ヘッダー === */
+    header { padding: 10px 16px; gap: 8px; flex-wrap: wrap; min-height: 52px; }
+    header h1 { font-size: 13px; }
+    .btn-reset { padding: 8px 12px; font-size: 12px; min-height: 44px; }
+    .save-indicator { display: none; } /* スペース節約 */
+
+    /* === レイアウト: ページ全体スクロール方式に変更 ===
+       form-area の内部スクロールをやめ、ページ自体をスクロールさせる。
+       iOS Safari でボトムバーにボタンが隠れる問題を防ぐ。        */
     .container {
       grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto auto; /* 両行とも高さ: コンテンツ次第 */
+      flex: none;                    /* flex:1 を解除して高さ固定を解除 */
+      min-height: 0;
+    }
+    .form-area {
+      overflow-y: visible;           /* 内部スクロールを廃止 */
+      padding: 20px 16px;
+      padding-bottom: max(32px, env(safe-area-inset-bottom, 32px));
+      min-height: 0;
     }
 
-    /* サイドバーを横スクロールのステップバーに変更 */
+    /* === ステップナビ: 常に画面上部に固定 ===
+       ページをスクロールしても ①〜⑤ が見え続ける。
+       5等分グリッドで全幅に広げ、横スクロール不要。          */
     .sidebar {
+      position: sticky;
+      top: 0;
+      z-index: 200;
       border-right: none;
       border-bottom: 1px solid var(--border);
       padding: 0;
-      display: flex;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      background: var(--bg);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
     }
     .step-nav-item {
+      display: flex;              /* 明示的に flex を指定 */
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       gap: 4px;
-      padding: 10px 16px;
-      min-width: 64px;
+      padding: 10px 2px;
+      min-width: 0;
+      min-height: 60px;           /* Apple HIG: タップ領域 44px 以上 */
       border-left: none;
       border-bottom: 3px solid transparent;
-      flex-shrink: 0;
+      touch-action: manipulation; /* 300ms タップ遅延を除去 */
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: pointer;
     }
     .step-nav-item.active {
       border-left-color: transparent;
       border-bottom-color: var(--accent);
       background: var(--surface);
     }
-    .step-label { font-size: 10px; text-align: center; }
+    .step-num { width: 28px; height: 28px; font-size: 12px; }
+    .step-label { font-size: 9px; text-align: center; line-height: 1.3; }
 
-    /* フォームエリア */
-    .form-area { padding: 24px 16px; }
+    /* === フォーム要素 === */
     .step-title { font-size: 18px; }
-    .field-group { margin-bottom: 22px; }
+    .field-group { margin-bottom: 20px; }
 
-    /* 2カラムグリッドを1カラムに */
+    /* インプット: min-height で確実なタップ領域を確保 */
+    input[type="text"], input[type="number"], input[type="date"],
+    input[type="email"], select, textarea {
+      min-height: 44px;
+      touch-action: manipulation;
+    }
+
+    /* ラジオ・チェックボックス */
+    .radio-item, .check-item {
+      min-height: 44px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* チェックボックスグリッド: 2列固定 */
     .check-grid { grid-template-columns: 1fr 1fr !important; }
     .radio-grid { grid-template-columns: 1fr 1fr !important; }
 
-    /* インライングリッドも1カラムに */
+    /* インラインの 2 カラムを縦積みに */
     .field-group > div[style*="grid-template-columns:1fr 1fr"] {
       display: block !important;
     }
@@ -804,20 +870,26 @@
       margin-bottom: 12px;
     }
 
-    /* ナビボタン */
-    .nav-buttons { flex-direction: row; justify-content: space-between; }
-    .btn { padding: 10px 18px; font-size: 13px; }
+    /* === ナビボタン（次へ / 戻る）===
+       min-height 52px・フォントサイズ 15px で確実に押せるサイズに。 */
+    .nav-buttons {
+      flex-direction: row;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 24px;
+    }
+    .btn {
+      padding: 14px 18px;
+      font-size: 15px;
+      min-height: 52px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
     .btn-generate { width: 100%; }
 
-    /* 結果ページ */
-    #result-page {
-      grid-column: 1;
-      padding: 20px 16px;
-    }
-    .pdf-header {
-      flex-direction: column;
-      gap: 8px;
-    }
+    /* === 結果ページ === */
+    #result-page { grid-column: 1; padding: 20px 16px; }
+    .pdf-header { flex-direction: column; gap: 8px; }
     .pdf-meta { text-align: left !important; }
     .result-title { font-size: 18px !important; }
     .flow-horizontal { flex-wrap: wrap; gap: 4px; }
@@ -2133,6 +2205,162 @@ function formatPumpSpec(spec) {
   return s;
 }
 
+// ===== SVG Flow Diagram Generator =====
+// 変更箇所: 旧HTMLベースのフロー図をSVGテンプレート方式に置換
+function buildFlowSVG(d) {
+  const hazardous = d.hazardous    || [];
+  const metals    = d.metals       || [];
+  const contam    = d.other_contam || [];
+  const chemicals = d.chemicals    || [];
+
+  const hasCyanide  = hazardous.includes('シアン(CN)');
+  const hasCr6      = hazardous.includes('六価クロム(Cr6+)');
+  const hasFluorine = hazardous.includes('フッ素(F)');
+  const hasOil      = contam.includes('油分あり');
+  const hasSS       = contam.includes('SS多い');
+  const hasMetal    = metals.length > 0 && !metals.every(m => m === 'なし');
+  const phMin       = parseFloat(d.ph_min);
+  const phMax       = parseFloat(d.ph_max);
+  const needPh      = (!isNaN(phMin) && phMin < 6) || (!isNaN(phMax) && phMax > 9);
+
+  // ── 主処理ノード（表示順に積む） ──
+  const main = [];
+  main.push({ lbl: '原水槽',       sub: d.raw_tank_size ? d.raw_tank_size + ' m³' : '', t: 'tank' });
+  main.push({ lbl: '原水ポンプ',   sub: '',                                               t: 'pump' });
+  if (hasCyanide)  main.push({ lbl: 'シアン酸化槽', sub: 'CN除去',          t: 'warn' });
+  if (hasCr6)      main.push({ lbl: '六価Cr還元槽', sub: 'Cr⁶⁺→Cr³⁺',      t: 'warn' });
+  if (hasOil)      main.push({ lbl: '油水分離槽',   sub: '浮上分離',         t: 'warn' });
+  if (needPh)      main.push({ lbl: 'pH調整槽',     sub: 'pH調整',           t: 'main' });
+  main.push({ lbl: '凝集沈殿槽',   sub: d.tank_capacity || '凝集・沈殿',     t: 'main' });
+  if (hasFluorine) main.push({ lbl: 'フッ素処理槽', sub: 'Ca添加',           t: 'warn' });
+  main.push({ lbl: 'ろ過装置',     sub: d.filter_branches ? d.filter_branches : 'スラッジろ過', t: 'main' });
+  main.push({ lbl: '処理水槽',     sub: d.discharge_dest || '放流',           t: 'end'  });
+
+  // ── 付帯設備（存在するものだけ追加） ──
+  const aux = [];
+  if (needPh || chemicals.some(c => c.includes('pH調整')))
+    aux.push({ lbl: 'pH計', sub: 'インライン' });
+  if (chemicals.length > 0 || d.pump_count > 0) {
+    const chemLbl = chemicals.filter(c => !c.includes('その他')).slice(0, 2).join('・') || '薬液';
+    aux.push({ lbl: '薬注タンク', sub: chemLbl });
+    aux.push({ lbl: '薬注ポンプ', sub: d.pump_count > 0 ? d.pump_count + ' 台' : '' });
+  }
+  aux.push({ lbl: '汚泥槽', sub: 'スラッジ貯留' });
+  aux.push({ lbl: '制御盤', sub: 'シーケンス制御' });
+
+  // ── レイアウト定数 ──
+  const BW = 112, BH = 54, BR = 7;
+  const AW = 26;          // 矢印幅
+  const STEP = BW + AW;
+  const PL = 20, PR = 20;
+  const HDR_H = 78;       // 情報ヘッダー高さ
+  const MAIN_Y = HDR_H + 26; // 主処理ノードのY座標
+  const svgW = PL + main.length * STEP - AW + PR;
+
+  // 付帯設備のレイアウト
+  const AUX_DIV_Y  = MAIN_Y + BH + 22;
+  const AUX_LBL_Y  = AUX_DIV_Y + 6;
+  const AUX_Y      = AUX_LBL_Y + 18;
+  const ABH = 44;
+  const auxArea = svgW - PL - PR;
+  const ASTEP = aux.length > 0 ? Math.floor(auxArea / aux.length) : auxArea;
+  const ABW   = Math.min(108, ASTEP - 10);
+  const svgH  = aux.length > 0 ? AUX_Y + ABH + 18 : MAIN_Y + BH + 20;
+
+  // ── カラーパレット ──
+  const C = {
+    hdrBg:      '#f0faf6', hdrLine: '#b8e8d8',
+    mainFill:   '#e8f5f0', mainStr: '#00856a',
+    warnFill:   '#fff3e8', warnStr: '#d4621a',
+    pumpFill:   '#eef2ff', pumpStr: '#3b5bdb',
+    tankFill:   '#f0f9ff', tankStr: '#0077cc',
+    endFill:    '#ebf5ff', endStr:  '#0055aa',
+    auxFill:    '#f7f8fa', auxStr:  '#9ca3af',
+    arrow:      '#00856a',
+    txt:        '#111827', sub:     '#6b7280',
+    secLbl:     '#9ca3af', div:     '#d1d5db',
+  };
+  const FF = "'Helvetica Neue',Arial,sans-serif";
+
+  const p = []; // SVG parts accumulator
+
+  // Defs（矢印マーカー）
+  p.push(`<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${C.arrow}"/></marker></defs>`);
+
+  // 背景
+  p.push(`<rect width="${svgW}" height="${svgH}" fill="#fff" rx="6" stroke="#e5e7eb" stroke-width="1"/>`);
+
+  // ── 情報ヘッダー ──
+  p.push(`<rect x="0" y="0" width="${svgW}" height="${HDR_H}" fill="${C.hdrBg}" rx="6"/>`);
+  p.push(`<rect x="0" y="${HDR_H - 8}" width="${svgW}" height="8" fill="${C.hdrBg}"/>`);
+  p.push(`<line x1="0" y1="${HDR_H}" x2="${svgW}" y2="${HDR_H}" stroke="${C.hdrLine}" stroke-width="1"/>`);
+
+  const infoItems = [
+    ['業種',   getIndustryLabel(d.industry) || '—'],
+    ['排水量', d.daily_volume ? d.daily_volume + ' m³/日' : '—'],
+    ['pH',     (d.ph_min || d.ph_max) ? (d.ph_min||'?') + '〜' + (d.ph_max||'?') : '—'],
+    ['SS',     hasSS ? '高い' : '標準'],
+    ['油分',   hasOil ? 'あり' : 'なし'],
+    ['重金属', hasMetal ? metals.filter(m => m !== 'なし').join('・') : 'なし'],
+  ];
+  const icW = svgW / infoItems.length;
+  infoItems.forEach(([k, v], i) => {
+    const ix = i * icW;
+    if (i > 0) p.push(`<line x1="${ix}" y1="10" x2="${ix}" y2="${HDR_H - 6}" stroke="#cce8dc" stroke-width="1"/>`);
+    p.push(`<text x="${ix + icW/2}" y="28" text-anchor="middle" font-family="${FF}" font-size="10" fill="${C.secLbl}">${k}</text>`);
+    const dv = v.length > 13 ? v.slice(0, 12) + '…' : v;
+    p.push(`<text x="${ix + icW/2}" y="56" text-anchor="middle" font-family="${FF}" font-size="13" font-weight="700" fill="${C.txt}">${dv}</text>`);
+  });
+
+  // ── セクションラベル ──
+  p.push(`<text x="${PL}" y="${MAIN_Y - 5}" font-family="${FF}" font-size="9" fill="${C.secLbl}" letter-spacing="1.5">主処理ライン</text>`);
+
+  // ── 主処理ノード ──
+  main.forEach((node, i) => {
+    const x = PL + i * STEP, y = MAIN_Y;
+    const cx = x + BW / 2;
+    let fill, str, sw;
+    switch (node.t) {
+      case 'warn': fill = C.warnFill; str = C.warnStr; sw = 1.5; break;
+      case 'pump': fill = C.pumpFill; str = C.pumpStr; sw = 1;   break;
+      case 'end':  fill = C.endFill;  str = C.endStr;  sw = 2;   break;
+      case 'tank': fill = C.tankFill; str = C.tankStr; sw = 1.5; break;
+      default:     fill = C.mainFill; str = C.mainStr; sw = 1.5;
+    }
+    p.push(`<rect x="${x}" y="${y}" width="${BW}" height="${BH}" rx="${BR}" fill="${fill}" stroke="${str}" stroke-width="${sw}"/>`);
+    if (node.sub) {
+      p.push(`<text x="${cx}" y="${y + 22}" text-anchor="middle" font-family="${FF}" font-size="12" font-weight="700" fill="${C.txt}">${node.lbl}</text>`);
+      p.push(`<text x="${cx}" y="${y + 40}" text-anchor="middle" font-family="${FF}" font-size="10" fill="${C.sub}">${node.sub}</text>`);
+    } else {
+      p.push(`<text x="${cx}" y="${y + BH/2 + 5}" text-anchor="middle" font-family="${FF}" font-size="12" font-weight="700" fill="${C.txt}">${node.lbl}</text>`);
+    }
+    // 矢印
+    if (i < main.length - 1) {
+      const ay = y + BH / 2;
+      p.push(`<line x1="${x+BW}" y1="${ay}" x2="${x+BW+AW-3}" y2="${ay}" stroke="${C.arrow}" stroke-width="2" marker-end="url(#ah)"/>`);
+    }
+  });
+
+  // ── 付帯設備 ──
+  if (aux.length > 0) {
+    p.push(`<line x1="${PL}" y1="${AUX_DIV_Y}" x2="${svgW-PR}" y2="${AUX_DIV_Y}" stroke="${C.div}" stroke-width="1" stroke-dasharray="5,4"/>`);
+    p.push(`<text x="${PL}" y="${AUX_LBL_Y + 12}" font-family="${FF}" font-size="9" fill="${C.secLbl}" letter-spacing="1.5">付帯設備</text>`);
+    aux.forEach((node, i) => {
+      const ax = PL + i * ASTEP, ay = AUX_Y, acx = ax + ABW / 2;
+      p.push(`<rect x="${ax}" y="${ay}" width="${ABW}" height="${ABH}" rx="5" fill="${C.auxFill}" stroke="${C.auxStr}" stroke-width="1" stroke-dasharray="4,3"/>`);
+      if (node.sub) {
+        p.push(`<text x="${acx}" y="${ay+17}" text-anchor="middle" font-family="${FF}" font-size="11" font-weight="600" fill="${C.txt}">${node.lbl}</text>`);
+        const ds = node.sub.length > 10 ? node.sub.slice(0, 9) + '…' : node.sub;
+        p.push(`<text x="${acx}" y="${ay+32}" text-anchor="middle" font-family="${FF}" font-size="9" fill="${C.sub}">${ds}</text>`);
+      } else {
+        p.push(`<text x="${acx}" y="${ay+ABH/2+4}" text-anchor="middle" font-family="${FF}" font-size="11" font-weight="600" fill="${C.txt}">${node.lbl}</text>`);
+      }
+    });
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="100%" style="display:block;max-width:100%;border-radius:6px;">${p.join('')}</svg>`;
+}
+
 // ===== Generate Result =====
 function generateResult() {
   const hazardous = data.hazardous || [];
@@ -2156,62 +2384,8 @@ function generateResult() {
   const subEl = document.getElementById('result-subinfo');
   if (subEl) subEl.textContent = subInfo;
 
-  // ---- フロー図（バッチ式・分岐構造）----
-  const destLabel = data.discharge_dest ? data.discharge_dest + 'へ' : '放流';
-  const tankLabel = (data.tank_capacity ? data.tank_capacity + ' / ' : '') + 'pH調整→凝集→沈殿';
-  const fluorineHTML = hasFluorine
-    ? `<div class="fh-arrow"></div><div class="fh-node">フッ素処理槽<br><small>Ca添加・沈殿</small></div>`
-    : '';
-
-  // 構造：
-  // 原水槽 → [前処理] → 凝集沈殿槽 → ろ過スタンド → ろ過水
-  //                          ↓
-  //                       上澄み液（直接放流）
-  // ※ 凝集沈殿槽にposition:relativeで↓を中央から生やす
-
-  const preArrows = (hasCyanide ? `<div class="fh-arrow"></div><div class="fh-node special">シアン酸化槽<br><small>CN除去</small></div>` : '')
-    + (hasChromium6 ? `<div class="fh-arrow"></div><div class="fh-node special">六価Cr還元槽<br><small>Cr⁶⁺→Cr³⁺</small></div>` : '');
-
-  const flowHTML = `
-  <div style="display:inline-flex; flex-direction:column; align-items:flex-start;">
-
-    <!-- 主線：横並び -->
-    <div style="display:flex; align-items:center;">
-      <div class="fh-node">${data.raw_tank_size ? '原水槽<br><small>' + data.raw_tank_size + 'm³</small>' : '原水槽'}</div>
-      ${preArrows}
-      <div class="fh-arrow"></div>
-      <div class="fh-node main-node" style="position:relative;">
-        凝集沈殿槽<br><small>${tankLabel}</small>
-        <!-- 下向き矢印を中央から生やす -->
-        <div style="position:absolute; bottom:-26px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center;">
-          <div class="fh-arrow-down"></div>
-        </div>
-      </div>
-      ${fluorineHTML}
-      <div class="fh-arrow"></div>
-      <div class="fh-node">ろ過スタンド<br><small>スラッジ→ろ過${data.filter_branches ? '（' + data.filter_branches + '）' : ''}</small></div>
-      <div class="fh-arrow"></div>
-      <div class="fh-node">ろ過水<br><small>放流（${destLabel}）</small></div>
-    </div>
-
-    <!-- 上澄み：凝集沈殿槽の中央真下 -->
-    <div style="display:flex; align-items:flex-start;">
-      <!-- 原水槽＋前処理分のスペーサー -->
-      <div style="visibility:hidden; display:flex; align-items:center;">
-        <div class="fh-node">原水槽</div>
-        ${preArrows ? preArrows + '<div class="fh-arrow"></div>' : ''}
-        <div class="fh-arrow"></div>
-      </div>
-      <!-- 凝集沈殿槽の幅に合わせて中央に上澄みノード -->
-      <div style="display:flex; flex-direction:column; align-items:center; min-width:130px;">
-        <div style="height:26px;"></div><!-- fh-arrow-downの高さ分スペース -->
-        <div class="fh-node">上澄み液<br><small>直接放流（${destLabel}）</small></div>
-      </div>
-    </div>
-
-  </div>`;
-
-  document.getElementById('result-flow').innerHTML = flowHTML;
+  // ---- フロー図（SVG生成 — buildFlowSVG に委譲）----
+  document.getElementById('result-flow').innerHTML = buildFlowSVG(data);
 
   // ---- データテーブル ----
   const rows = [
