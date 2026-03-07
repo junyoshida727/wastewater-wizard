@@ -1,0 +1,22 @@
+{
+  "name": "wastewater-wizard",
+  "version": "1.0.0",
+  "description": "排水処理ヒアリングシステム — 単一HTMLファイル構成のウィザード型ヒアリングシート",
+  "scripts": {
+    "dev": "live-server --port=3000 --open=index.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/junyoshida727/wastewater-wizard.git"
+  },
+  "keywords": ["wastewater", "wizard", "hearing-sheet"],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/junyoshida727/wastewater-wizard/issues"
+  },
+  "homepage": "https://github.com/junyoshida727/wastewater-wizard#readme",
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
