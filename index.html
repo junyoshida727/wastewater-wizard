@@ -549,13 +549,17 @@
     border-radius: 10px;
     padding: 20px 24px 24px;
     margin-bottom: 24px;
-    overflow: hidden;
+    overflow: visible;
   }
   /* SVGフロー図を格納するdivは横スクロール可能に */
   #result-flow {
     overflow-x: auto;
+    overflow-y: visible;
     -webkit-overflow-scrolling: touch;
     border-radius: 6px;
+    /* スクロールバーを細く表示 */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
   .flow-result-title {
     font-size: 11px;
@@ -2359,7 +2363,7 @@ function buildFlowSVG(d) {
     });
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="100%" style="display:block;max-width:100%;border-radius:6px;">${p.join('')}<\/svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="100%" style="display:block;min-width:${svgW}px;border-radius:6px;">${p.join('')}<\/svg>`;
 }
 
 // ===== Generate Result =====
