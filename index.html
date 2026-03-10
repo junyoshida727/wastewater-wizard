@@ -68,7 +68,7 @@
   /* Main Layout */
   .container {
     display: grid;
-    grid-template-columns: 220px 1fr 280px;
+    grid-template-columns: 220px 1fr;
     flex: 1;
     gap: 0;
   }
@@ -442,6 +442,7 @@
     border-left: 1px solid var(--border);
     padding: 32px 24px;
     background: var(--surface);
+    display: none;
   }
   .preview-title {
     font-family: 'Space Mono', monospace;
@@ -529,7 +530,7 @@
   #result-page {
     display: none;
     padding: 40px 48px;
-    grid-column: 2 / 4;
+    grid-column: 2 / 3;
     max-width: 900px;
   }
   #result-page.show { display: block; }
@@ -720,6 +721,85 @@
     padding: 24px 32px;
     margin-bottom: 24px;
   }
+
+  /* STEP2 薬剤詳細入力エリア */
+  .chem-details-area {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .chem-details-label {
+    font-size: 11px;
+    color: var(--text2);
+    margin-bottom: 8px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .chem-details-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .chem-details-table th {
+    font-size: 10px;
+    color: var(--text2);
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    font-weight: 600;
+  }
+  .chem-details-table td {
+    padding: 4px 4px;
+    vertical-align: middle;
+  }
+  .chem-details-table td:first-child {
+    color: var(--text2);
+    font-size: 11px;
+    white-space: nowrap;
+    padding-left: 0;
+  }
+  .chem-detail-input {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 12px;
+    background: #fff;
+    color: var(--text);
+    box-sizing: border-box;
+    font-family: inherit;
+  }
+  .chem-detail-input:focus { outline: none; border-color: var(--accent); }
+
+  /* 結果ページ 薬剤テーブル */
+  .chemical-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 32px;
+    margin-bottom: 24px;
+  }
+  .chemical-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+  .chemical-table th {
+    background: var(--accent);
+    color: #fff;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: left;
+    letter-spacing: 0.5px;
+  }
+  .chemical-table tr { border-bottom: 1px solid var(--border); }
+  .chemical-table tr:last-child { border-bottom: none; }
+  .chemical-table td { padding: 7px 12px; vertical-align: middle; color: var(--text); }
+  .chemical-table td:first-child { color: var(--text2); font-size: 12px; font-weight: 500; }
   .data-table {
     width: 100%;
     border-collapse: collapse;
@@ -736,6 +816,41 @@
     font-weight: 500;
   }
   .data-table td:last-child { color: var(--text); }
+
+  .missing-check-section {
+    background: rgba(255, 196, 0, 0.06);
+    border: 1px solid rgba(255, 196, 0, 0.24);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 24px;
+  }
+  .missing-check-warn {
+    color: var(--warn);
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .missing-check-ok {
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .missing-check-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .missing-check-item {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 12px;
+  }
 
   .fh-branch {
     display: flex;
@@ -901,6 +1016,44 @@
     .data-table-section, .notes-section { font-size: 12px; }
     .action-buttons { flex-direction: column; }
     .action-buttons .btn { width: 100%; text-align: center; }
+
+    /* === フロー図（SVG）: スマホでは縮小して収める === */
+    #result-flow {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #result-flow svg {
+      max-width: none;
+      transform-origin: top left;
+    }
+
+    /* === 薬剤詳細テーブル: スマホでは縦積みカード形式に === */
+    .chem-details-table thead { display: none; }
+    .chem-details-table tr {
+      display: flex;
+      flex-direction: column;
+      border-bottom: 1px solid var(--border);
+      padding: 8px 0;
+      gap: 6px;
+    }
+    .chem-details-table td {
+      display: block;
+      width: 100%;
+      padding: 0;
+    }
+    .chem-details-table td:first-child {
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .chem-detail-input { min-height: 44px; font-size: 14px; }
+
+    /* === 脱水機メーカー・型番の2カラムを縦積みに === */
+    #dehydrator-detail > div[style*="grid-template-columns"] {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 10px !important;
+    }
   }
 
   /* Safari向け: grid gap対応 */
@@ -954,8 +1107,17 @@
       padding: 10px !important;
       margin-bottom: 8px !important;
       break-inside: avoid;
+      overflow: hidden !important;
     }
     .flow-result-title { font-size: 8pt !important; margin-bottom: 8px !important; color: #333 !important; }
+
+    /* PDF出力時のみフロー図を縮小して紙幅に収める */
+    #result-flow {
+      overflow: visible !important;
+      transform: scale(0.55);
+      transform-origin: top left;
+      margin-bottom: -120px !important;
+    }
 
     .fh-node {
       background: #e8f8f2 !important;
@@ -1001,6 +1163,22 @@
     .note-icon { color: #cc4400 !important; }
     .note-ok { color: #00856a !important; }
     .notes-title { font-weight: 700 !important; color: #111 !important; }
+
+    /* 薬剤テーブル（PDF時は全幅） */
+    .chemical-section {
+      display: block !important;
+      width: 100% !important;
+      background: #f7f7f7 !important;
+      border: 1px solid #ccc !important;
+      padding: 8px !important;
+      margin-bottom: 8px !important;
+      box-sizing: border-box !important;
+      break-inside: avoid;
+    }
+    .chemical-table { font-size: 8pt !important; width: 100% !important; }
+    .chemical-table th { font-size: 7pt !important; padding: 3px 6px !important; background: #00856a !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .chemical-table td { padding: 3px 6px !important; color: #111 !important; }
+    .chemical-table td:first-child { color: #333 !important; font-weight: 600 !important; }
   }
 
   /* Tooltip */
@@ -1076,7 +1254,7 @@
     </div>
     <div class="step-nav-item" data-step="3" onclick="goStep(3)">
       <div class="step-num">3</div>
-      <div class="step-label">放流先・規制</div>
+      <div class="step-label">装置オプション</div>
     </div>
     <div class="step-nav-item" data-step="4" onclick="goStep(4)">
       <div class="step-num">4</div>
@@ -1239,6 +1417,7 @@
           <div class="radio-item" onclick="selectRadio('filter_branches', '3分岐', this)">3分岐</div>
           <div class="radio-item" onclick="selectRadio('filter_branches', '4分岐', this)">4分岐</div>
           <div class="radio-item" onclick="selectRadio('filter_branches', '5分岐', this)">5分岐</div>
+          <div class="radio-item" onclick="selectRadio('filter_branches', 'ろ過しない', this)">ろ過しない</div>
           <div class="radio-item" onclick="selectRadio('filter_branches', '不明', this)">不明</div>
         </div>
       </div>
@@ -1251,6 +1430,11 @@
           <div class="radio-item" onclick="selectRadio('powder_feeder', '使用しない', this)">使用しない</div>
           <div class="radio-item" onclick="selectRadio('powder_feeder', '未定', this)">未定</div>
         </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">備考・特記事項</div>
+        <textarea id="step_notes1" rows="2" placeholder="このステップに関するメモや補足事項" oninput="updateData('step_notes1', this.value)" style="resize:vertical;"></textarea>
       </div>
 
       <div class="nav-buttons">
@@ -1277,6 +1461,22 @@
             <input type="number" id="ph_max" placeholder="最大値 例:5" min="0" max="14" step="0.1" oninput="updateData('ph_max', this.value); updateFlowPreview()">
             <span class="unit">以下</span>
           </div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">原水の水温</div>
+        <div class="input-with-unit">
+          <input type="number" id="raw_water_temp" placeholder="例: 25" oninput="updateData('raw_water_temp', this.value)">
+          <span class="unit">℃</span>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">汚泥量</div>
+        <div class="input-with-unit">
+          <input type="number" id="sludge_amount" placeholder="例: 0.5" min="0.1" step="0.1" oninput="updateData('sludge_amount', this.value)">
+          <span class="unit">kg</span>
         </div>
       </div>
 
@@ -1317,17 +1517,29 @@
         <div class="field-label">使用薬品（複数選択可）</div>
         <div style="font-size:11px; color:var(--text3); margin-bottom:8px;">選択内容から薬注ポンプの必要台数を自動算出します</div>
         <div class="check-grid" id="chemicals">
-          <div class="check-item" onclick="toggleCheck('chemicals', 'pH調整剤（酸）', this); calcPumps()"><div class="check-box"></div>pH調整剤（酸）</div>
-          <div class="check-item" onclick="toggleCheck('chemicals', 'pH調整剤（アルカリ）', this); calcPumps()"><div class="check-box"></div>pH調整剤（アルカリ）</div>
-          <div class="check-item" onclick="toggleCheck('chemicals', 'キレート剤', this); calcPumps()"><div class="check-box"></div>キレート剤</div>
-          <div class="check-item" onclick="toggleCheck('chemicals', '液体凝集剤', this); calcPumps()"><div class="check-box"></div>液体凝集剤</div>
-          <div class="check-item" onclick="toggleCheck('chemicals', '酸化剤（シアン処理用）', this); calcPumps()"><div class="check-box"></div>酸化剤（CN処理）</div>
-          <div class="check-item" onclick="toggleCheck('chemicals', '還元剤（Cr6+処理用）', this); calcPumps()"><div class="check-box"></div>還元剤（Cr⁶⁺処理）</div>
-          <div class="check-item" id="chem_other_item" onclick="toggleChemOther(this); calcPumps()"><div class="check-box"></div>その他</div>
+          <div class="check-item" onclick="toggleCheck('chemicals', 'pH調整剤（酸）', this); calcPumps(); updateChemDetailsTable()"><div class="check-box"></div>pH調整剤（酸）</div>
+          <div class="check-item" onclick="toggleCheck('chemicals', 'pH調整剤（アルカリ）', this); calcPumps(); updateChemDetailsTable()"><div class="check-box"></div>pH調整剤（アルカリ）</div>
+          <div class="check-item" onclick="toggleCheck('chemicals', 'キレート剤', this); calcPumps(); updateChemDetailsTable()"><div class="check-box"></div>キレート剤</div>
+          <div class="check-item" onclick="toggleCheck('chemicals', '液体凝集剤', this); calcPumps(); updateChemDetailsTable()"><div class="check-box"></div>液体凝集剤</div>
+          <div class="check-item" onclick="toggleCheck('chemicals', '酸化剤（シアン処理用）', this); calcPumps(); updateChemDetailsTable()"><div class="check-box"></div>酸化剤（CN処理）</div>
+          <div class="check-item" onclick="toggleCheck('chemicals', '還元剤（Cr6+処理用）', this); calcPumps(); updateChemDetailsTable()"><div class="check-box"></div>還元剤（Cr⁶⁺処理）</div>
+          <div class="check-item" id="chem_other_item" onclick="toggleChemOther(this); calcPumps(); updateChemDetailsTable()"><div class="check-box"></div>その他</div>
         </div>
+
+        <!-- 薬剤詳細入力エリア（チェック後に展開） -->
+        <div class="chem-details-area" id="chem-details-area" style="display:none;">
+          <div class="chem-details-label">薬剤名・添加量（任意）</div>
+          <table class="chem-details-table">
+            <thead>
+              <tr><th style="width:130px;">薬剤用途</th><th>薬剤名</th><th>添加量</th></tr>
+            </thead>
+            <tbody id="chem-details-tbody"></tbody>
+          </table>
+        </div>
+
         <div id="chem_other_wrap" style="display:none; margin-top:8px;">
           <div style="font-size:12px; color:var(--text2); margin-bottom:6px;">その他の薬注ポンプ台数</div>
-          <select id="chem_other_count" onchange="updateData('chem_other_count', this.value); calcPumps()" style="width:160px;">
+          <select id="chem_other_count" onchange="updateData('chem_other_count', this.value); calcPumps(); updateChemDetailsTable()" style="width:160px;">
             <option value="">台数を選択</option>
             <option value="1">1台</option>
             <option value="2">2台</option>
@@ -1343,20 +1555,6 @@
         </div>
       </div>
 
-      <div class="nav-buttons">
-        <button class="btn btn-secondary" onclick="goStep(1)">← 戻る</button>
-        <button class="btn btn-primary" onclick="goStep(3)">次へ →</button>
-      </div>
-    </div>
-
-    <!-- STEP 3 -->
-    <div class="step-panel" id="step3">
-      <div class="step-header">
-        <div class="step-tag">STEP 03 — DISCHARGE</div>
-        <div class="step-title">放流先・規制</div>
-        <div class="step-desc">放流先によって達成すべき水質基準が変わります</div>
-      </div>
-
       <div class="field-group">
         <div class="field-label">放流先</div>
         <div class="radio-grid" id="discharge_dest">
@@ -1368,31 +1566,87 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">都道府県</div>
-        <select id="prefecture" onchange="updateData('prefecture', this.value)">
-          <option value="">選択（任意）</option>
-          <option>北海道</option><option>青森県</option><option>岩手県</option><option>宮城県</option>
-          <option>秋田県</option><option>山形県</option><option>福島県</option><option>茨城県</option>
-          <option>栃木県</option><option>群馬県</option><option>埼玉県</option><option>千葉県</option>
-          <option>東京都</option><option>神奈川県</option><option>新潟県</option><option>富山県</option>
-          <option>石川県</option><option>福井県</option><option>山梨県</option><option>長野県</option>
-          <option>岐阜県</option><option>静岡県</option><option>愛知県</option><option>三重県</option>
-          <option>滋賀県</option><option>京都府</option><option>大阪府</option><option>兵庫県</option>
-          <option>奈良県</option><option>和歌山県</option><option>鳥取県</option><option>島根県</option>
-          <option>岡山県</option><option>広島県</option><option>山口県</option><option>徳島県</option>
-          <option>香川県</option><option>愛媛県</option><option>高知県</option><option>福岡県</option>
-          <option>佐賀県</option><option>長崎県</option><option>熊本県</option><option>大分県</option>
-          <option>宮崎県</option><option>鹿児島県</option><option>沖縄県</option>
-        </select>
-      </div>
-
-      <div class="field-group">
         <div class="field-label">排水基準の把握状況</div>
         <div class="radio-grid" id="regulation_status">
           <div class="radio-item" onclick="selectRadio('regulation_status', '把握済み', this)">把握済み</div>
           <div class="radio-item" onclick="selectRadio('regulation_status', '概ね把握', this)">概ね把握</div>
           <div class="radio-item" onclick="selectRadio('regulation_status', '不明', this)">不明</div>
         </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">備考・特記事項</div>
+        <textarea id="step_notes2" rows="2" placeholder="このステップに関するメモや補足事項" oninput="updateData('step_notes2', this.value)" style="resize:vertical;"></textarea>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-secondary" onclick="goStep(1)">← 戻る</button>
+        <button class="btn btn-primary" onclick="goStep(3)">次へ →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step-panel" id="step3">
+      <div class="step-header">
+        <div class="step-tag">STEP 03 — EQUIPMENT OPTIONS</div>
+        <div class="step-title">装置オプション</div>
+        <div class="step-desc">標準仕様に追加するオプション機器を選択してください</div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">槽（複数選択可）</div>
+        <div style="font-size:11px; color:var(--text3); margin-bottom:8px;">標準付属以外の槽を選択してください</div>
+        <div class="check-grid" id="option_tanks">
+          <div class="check-item" onclick="toggleCheck('option_tanks', '中継槽', this)"><div class="check-box"></div>中継槽</div>
+          <div class="check-item" onclick="toggleCheck('option_tanks', '汚泥貯槽', this)"><div class="check-box"></div>汚泥貯槽</div>
+          <div class="check-item" onclick="toggleCheck('option_tanks', '監視槽', this)"><div class="check-box"></div>監視槽</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">pH計</div>
+        <div style="font-size:11px; color:var(--text3); margin-bottom:6px;">※凝集沈殿槽（本体）は標準装備。追加設置する槽を選択してください</div>
+        <div class="check-grid" id="option_ph_tanks">
+          <div class="check-item" onclick="toggleCheck('option_ph_tanks', '中継槽', this)"><div class="check-box"></div>中継槽</div>
+          <div class="check-item" onclick="toggleCheck('option_ph_tanks', '汚泥貯槽', this)"><div class="check-box"></div>汚泥貯槽</div>
+          <div class="check-item" onclick="toggleCheck('option_ph_tanks', '監視槽', this)"><div class="check-box"></div>監視槽</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">濁度計</div>
+        <div style="font-size:11px; color:var(--text3); margin-bottom:6px;">設置する槽を選択してください</div>
+        <div class="check-grid" id="option_turbidity_tanks">
+          <div class="check-item" onclick="toggleCheck('option_turbidity_tanks', '中継槽', this)"><div class="check-box"></div>中継槽</div>
+          <div class="check-item" onclick="toggleCheck('option_turbidity_tanks', '汚泥貯槽', this)"><div class="check-box"></div>汚泥貯槽</div>
+          <div class="check-item" onclick="toggleCheck('option_turbidity_tanks', '監視槽', this)"><div class="check-box"></div>監視槽</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">脱水機</div>
+        <div class="radio-grid" id="option_dehydrator">
+          <div class="radio-item" onclick="selectRadio('option_dehydrator', '必要', this); toggleDehydratorDetail(true)">必要</div>
+          <div class="radio-item" onclick="selectRadio('option_dehydrator', '不要', this); toggleDehydratorDetail(false)">不要</div>
+          <div class="radio-item" onclick="selectRadio('option_dehydrator', '未定', this); toggleDehydratorDetail(false)">未定</div>
+        </div>
+        <div id="dehydrator-detail" style="display:none; margin-top:10px; display:none;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <div style="font-size:12px; color:var(--text2); margin-bottom:4px;">メーカー</div>
+              <input type="text" id="dehydrator_maker" placeholder="例：荏原製作所" oninput="updateData('dehydrator_maker', this.value)">
+            </div>
+            <div>
+              <div style="font-size:12px; color:var(--text2); margin-bottom:4px;">型番</div>
+              <input type="text" id="dehydrator_model" placeholder="例：TYPE-100" oninput="updateData('dehydrator_model', this.value)">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">備考・特記事項</div>
+        <textarea id="step_notes3" rows="2" placeholder="このステップに関するメモや補足事項" oninput="updateData('step_notes3', this.value)" style="resize:vertical;"></textarea>
       </div>
 
       <div class="nav-buttons">
@@ -1461,8 +1715,9 @@
         <div style="font-size:11px; color:var(--text3); margin-bottom:8px;">選択した箇所の数が必要台数になります（凝集沈殿槽は標準付属）</div>
         <div class="check-grid" id="level_sensors">
           <div class="check-item" onclick="toggleCheck('level_sensors', '原水槽', this); calcSensors()"><div class="check-box"></div>原水槽</div>
-          <div class="check-item" onclick="toggleCheck('level_sensors', '中間槽', this); calcSensors()"><div class="check-box"></div>中間槽</div>
-          <div class="check-item" onclick="toggleCheck('level_sensors', '処理水受け槽', this); calcSensors()"><div class="check-box"></div>処理水受け槽</div>
+          <div class="check-item" onclick="toggleCheck('level_sensors', '中継槽', this); calcSensors()"><div class="check-box"></div>中継槽</div>
+          <div class="check-item" onclick="toggleCheck('level_sensors', '汚泥貯槽', this); calcSensors()"><div class="check-box"></div>汚泥貯槽</div>
+          <div class="check-item" onclick="toggleCheck('level_sensors', '監視槽', this); calcSensors()"><div class="check-box"></div>監視槽</div>
           <div class="check-item" onclick="toggleCheck('level_sensors', 'ろ過受け槽', this); calcSensors()"><div class="check-box"></div>ろ過受け槽</div>
           <div class="check-item" id="sensor-other-item" onclick="toggleSensorOther(this); calcSensors()"><div class="check-box"></div>その他</div>
         </div>
@@ -1487,6 +1742,11 @@
           <span style="color:var(--text2);"> 台</span>
           <div id="sensor-detail" style="font-size:11px; color:var(--text3); margin-top:3px;"></div>
         </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">備考・特記事項</div>
+        <textarea id="step_notes4" rows="2" placeholder="このステップに関するメモや補足事項" oninput="updateData('step_notes4', this.value)" style="resize:vertical;"></textarea>
       </div>
 
       <div class="nav-buttons">
@@ -1517,6 +1777,23 @@
           <div class="radio-item" onclick="selectRadio('location_type', '屋内', this)">屋内</div>
           <div class="radio-item" onclick="selectRadio('location_type', '屋外', this)">屋外</div>
           <div class="radio-item" onclick="selectRadio('location_type', '半屋外', this)">半屋外</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">電源コード長さ</div>
+        <div class="input-with-unit">
+          <input type="number" id="power_cable_length" placeholder="例: 5" min="0" oninput="updateData('power_cable_length', this.value)">
+          <span class="unit">m</span>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">一次側電源の接続形状</div>
+        <div class="radio-grid" id="primary_power_connection">
+          <div class="radio-item" onclick="selectRadio('primary_power_connection', 'コンセント（ストレート）', this)">コンセント（ストレート）</div>
+          <div class="radio-item" onclick="selectRadio('primary_power_connection', 'コンセント（引っ掛け）', this)">コンセント（引っ掛け）</div>
+          <div class="radio-item" onclick="selectRadio('primary_power_connection', '端子', this)">端子</div>
         </div>
       </div>
 
@@ -1638,11 +1915,27 @@
       <div class="flow-horizontal" id="result-flow"></div>
     </div>
 
+    <div class="missing-check-section">
+      <div class="flow-result-title">入力漏れチェック</div>
+      <div id="result-missing-check"></div>
+    </div>
+
     <!-- 入力データ一覧 -->
     <div class="data-table-section">
       <div class="flow-result-title">ヒアリング内容一覧</div>
       <table class="data-table" id="result-data-table">
         <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- 使用薬剤・添加量 -->
+    <div class="chemical-section" id="result-chemical-section" style="display:none;">
+      <div class="flow-result-title">使用薬剤・添加量</div>
+      <table class="chemical-table">
+        <thead>
+          <tr><th style="width:130px;">薬剤用途</th><th>薬剤名</th><th>添加量</th></tr>
+        </thead>
+        <tbody id="result-chemical-tbody"></tbody>
       </table>
     </div>
 
@@ -1679,16 +1972,18 @@ const data = {
   install_type: '', delivery_pref: '', delivery_city: '',
   industry: '', wastewater_type: '', daily_volume: '', working_days: '', batch_count: '',
   tank_capacity: '', filter_branches: '', powder_feeder: '',
-  chemicals: [], pump_count: 0, chem_other_count: '',
-  ph_min: '', ph_max: '',
+  chemicals: [], pump_count: 0, chem_other_count: '', chem_details: {},
+  ph_min: '', ph_max: '', sludge_amount: '',
   metals: [], hazardous: [], other_contam: [],
-  discharge_dest: '', prefecture: '', regulation_status: '',
+  discharge_dest: '', regulation_status: '',
+  option_tanks: [], option_ph_tanks: [], option_turbidity_tanks: [],
+  option_dehydrator: '', dehydrator_maker: '', dehydrator_model: '',
   raw_tank: '', raw_tank_size: '', existing_equip: [], existing_equip_other: '',
   existing_power_kw: '', power_status: '',
   extra_pumps: [],
   level_sensors: [], sensor_count: 0, sensor_other_count: '', sensor_other_note: '',
-  space_area: '', location_type: '', carry_in: [], access: [],
-  pipe_distance: '', pipe_step: '', slope_status: '', notes: ''
+  space_area: '', location_type: '', power_cable_length: '', primary_power_connection: '', carry_in: [], access: [],
+  pipe_distance: '', pipe_step: '', slope_status: '', notes: '', step_notes1: '', step_notes2: '', step_notes3: '', step_notes4: ''
 };
 
 let currentStep = 1;
@@ -1760,14 +2055,16 @@ function _restoreUI(targetStep) {
   // ── テキスト・数値・日付系 ──
   ['customer_name','desired_delivery','staff_email','delivery_city',
    'wastewater_type','daily_volume','working_days','raw_tank_size',
-   'space_area','pipe_distance','pipe_step','notes','sensor_other_note'
+   'space_area','power_cable_length','pipe_distance','pipe_step','notes','sensor_other_note',
+   'dehydrator_maker','dehydrator_model','sludge_amount',
+   'step_notes1','step_notes2','step_notes3','step_notes4'
   ].forEach(key => {
     const el = document.getElementById(key);
     if (el && data[key] != null) el.value = data[key];
   });
 
   // ── セレクト（都道府県など） ──
-  ['delivery_pref','prefecture'].forEach(key => {
+  ['delivery_pref'].forEach(key => {
     const el = document.getElementById(key);
     if (el && data[key]) el.value = data[key];
   });
@@ -1787,8 +2084,8 @@ function _restoreUI(targetStep) {
 
   // ── ラジオボタン（onclick属性から値を照合） ──
   ['install_type','batch_count','tank_capacity','filter_branches','powder_feeder',
-   'discharge_dest','regulation_status','raw_tank','power_status',
-   'location_type','slope_status'
+   'discharge_dest','regulation_status','option_dehydrator','raw_tank','power_status',
+   'location_type','primary_power_connection','slope_status'
   ].forEach(key => {
     if (!data[key]) return;
     const container = document.getElementById(key);
@@ -1800,7 +2097,8 @@ function _restoreUI(targetStep) {
   });
 
   // ── チェックボックス（onclick属性から値を照合） ──
-  ['metals','hazardous','other_contam','chemicals','level_sensors','carry_in','access'
+  ['metals','hazardous','other_contam','chemicals','level_sensors','carry_in','access',
+   'option_tanks','option_ph_tanks','option_turbidity_tanks'
   ].forEach(key => {
     const vals = data[key];
     if (!vals || !vals.length) return;
@@ -1841,6 +2139,12 @@ function _restoreUI(targetStep) {
     }
   }
 
+  // ── 脱水機「必要」選択時の詳細欄を表示復元 ──
+  if (data.option_dehydrator === '必要') {
+    const el = document.getElementById('dehydrator-detail');
+    if (el) el.style.display = 'block';
+  }
+
   // ── 追加ポンプ行を再構築 ──
   const savedPumps = (data.extra_pumps || []).filter(Boolean);
   data.extra_pumps = [];
@@ -1873,6 +2177,7 @@ function _restoreUI(targetStep) {
   // ── 再計算・プレビュー更新 ──
   calcPumps();
   calcSensors();
+  updateChemDetailsTable();
   updateFlowPreview();
   updateSummary();
 
@@ -2147,6 +2452,60 @@ function toggleChemOther(el) {
   updateSummary();
 }
 
+function toggleDehydratorDetail(show) {
+  const el = document.getElementById('dehydrator-detail');
+  if (el) el.style.display = show ? 'block' : 'none';
+  if (!show) {
+    data.dehydrator_maker = '';
+    data.dehydrator_model = '';
+    const m = document.getElementById('dehydrator_maker');
+    const mo = document.getElementById('dehydrator_model');
+    if (m) m.value = '';
+    if (mo) mo.value = '';
+  }
+  updateSummary();
+}
+
+// 薬剤詳細（薬剤名・添加量）の更新
+function updateChemDetail(key, field, value) {
+  if (!data.chem_details) data.chem_details = {};
+  if (!data.chem_details[key]) data.chem_details[key] = {name: '', amount: ''};
+  data.chem_details[key][field] = value;
+  saveToLocalStorage();
+}
+
+// 薬剤詳細入力テーブルをチェック状態に合わせて再描画
+function updateChemDetailsTable() {
+  const chems = data.chemicals || [];
+  const otherSelected = document.getElementById('chem_other_item')?.classList.contains('selected');
+  const otherCount = parseInt(data.chem_other_count) || (otherSelected ? 1 : 0);
+  const area = document.getElementById('chem-details-area');
+  const tbody = document.getElementById('chem-details-tbody');
+  if (!area || !tbody) return;
+  if (!data.chem_details) data.chem_details = {};
+
+  // 通常薬品 + その他を台数分展開したキーリスト
+  const allChems = [...chems];
+  if (otherSelected) {
+    for (let i = 1; i <= otherCount; i++) {
+      allChems.push(otherCount === 1 ? 'その他' : `その他 ${i}`);
+    }
+  }
+
+  if (allChems.length === 0) { area.style.display = 'none'; return; }
+  area.style.display = 'block';
+
+  const esc = s => (s || '').replace(/"/g, '&quot;');
+  tbody.innerHTML = allChems.map(c => {
+    const d = data.chem_details[c] || {name: '', amount: ''};
+    return `<tr>
+      <td>${c}</td>
+      <td><input class="chem-detail-input" type="text" placeholder="例：硫酸" value="${esc(d.name)}" oninput="updateChemDetail('${c}','name',this.value)"></td>
+      <td><input class="chem-detail-input" type="text" placeholder="例：50 mL/m³" value="${esc(d.amount)}" oninput="updateChemDetail('${c}','amount',this.value)"></td>
+    </tr>`;
+  }).join('');
+}
+
 // 薬注ポンプ台数自動算出
 function calcPumps() {
   const c = data.chemicals || [];
@@ -2213,157 +2572,262 @@ function formatPumpSpec(spec) {
 // ===== SVG Flow Diagram Generator =====
 // 変更箇所: 旧HTMLベースのフロー図をSVGテンプレート方式に置換
 function buildFlowSVG(d) {
-  const hazardous = d.hazardous    || [];
-  const metals    = d.metals       || [];
-  const contam    = d.other_contam || [];
-  const chemicals = d.chemicals    || [];
-
-  const hasCyanide  = hazardous.includes('シアン(CN)');
-  const hasCr6      = hazardous.includes('六価クロム(Cr6+)');
-  const hasFluorine = hazardous.includes('フッ素(F)');
-  const hasOil      = contam.includes('油分あり');
-  const hasSS       = contam.includes('SS多い');
-  const hasMetal    = metals.length > 0 && !metals.every(m => m === 'なし');
-  const phMin       = parseFloat(d.ph_min);
-  const phMax       = parseFloat(d.ph_max);
-  const needPh      = (!isNaN(phMin) && phMin < 6) || (!isNaN(phMax) && phMax > 9);
-
-  // ── 主処理ノード（表示順に積む） ──
-  const main = [];
-  main.push({ lbl: '原水槽',       sub: d.raw_tank_size ? d.raw_tank_size + ' m³' : '', t: 'tank' });
-  main.push({ lbl: '原水ポンプ',   sub: '',                                               t: 'pump' });
-  if (hasCyanide)  main.push({ lbl: 'シアン酸化槽', sub: 'CN除去',          t: 'warn' });
-  if (hasCr6)      main.push({ lbl: '六価Cr還元槽', sub: 'Cr⁶⁺→Cr³⁺',      t: 'warn' });
-  if (hasOil)      main.push({ lbl: '油水分離槽',   sub: '浮上分離',         t: 'warn' });
-  if (needPh)      main.push({ lbl: 'pH調整槽',     sub: 'pH調整',           t: 'main' });
-  main.push({ lbl: '凝集沈殿槽',   sub: d.tank_capacity || '凝集・沈殿',     t: 'main' });
-  if (hasFluorine) main.push({ lbl: 'フッ素処理槽', sub: 'Ca添加',           t: 'warn' });
-  main.push({ lbl: 'ろ過装置',     sub: d.filter_branches ? d.filter_branches : 'スラッジろ過', t: 'main' });
-  main.push({ lbl: '処理水槽',     sub: d.discharge_dest || '放流',           t: 'end'  });
-
-  // ── 付帯設備（存在するものだけ追加） ──
-  const aux = [];
-  if (needPh || chemicals.some(c => c.includes('pH調整')))
-    aux.push({ lbl: 'pH計', sub: 'インライン' });
-  if (chemicals.length > 0 || d.pump_count > 0) {
-    const chemLbl = chemicals.filter(c => !c.includes('その他')).slice(0, 2).join('・') || '薬液';
-    aux.push({ lbl: '薬注タンク', sub: chemLbl });
-    aux.push({ lbl: '薬注ポンプ', sub: d.pump_count > 0 ? d.pump_count + ' 台' : '' });
+  const chemicals = Array.isArray(d.chemicals) ? d.chemicals.filter(Boolean) : [];
+  const topInputs = [...chemicals];
+  // その他薬品を台数分展開してフロー図に追加
+  const otherCount = parseInt(d.chem_other_count) || 0;
+  if (otherCount > 0) {
+    for (let i = 1; i <= otherCount; i++) {
+      const key = otherCount === 1 ? 'その他' : `その他 ${i}`;
+      const customName = (d.chem_details || {})[key]?.name;
+      topInputs.push(customName || (otherCount === 1 ? 'その他' : `その他${i}`));
+    }
   }
-  aux.push({ lbl: '汚泥槽', sub: 'スラッジ貯留' });
-  aux.push({ lbl: '制御盤', sub: 'シーケンス制御' });
+  if (d.powder_feeder === '使用する' && !topInputs.includes('粉体供給機')) topInputs.push('粉体供給機');
 
-  // ── レイアウト定数 ──
-  const BW = 112, BH = 54, BR = 7;
-  const AW = 26;          // 矢印幅
-  const STEP = BW + AW;
-  const PL = 20, PR = 20;
-  const HDR_H = 78;       // 情報ヘッダー高さ
-  const MAIN_Y = HDR_H + 26; // 主処理ノードのY座標
-  const svgW = PL + main.length * STEP - AW + PR;
-
-  // 付帯設備のレイアウト
-  const AUX_DIV_Y  = MAIN_Y + BH + 22;
-  const AUX_LBL_Y  = AUX_DIV_Y + 6;
-  const AUX_Y      = AUX_LBL_Y + 18;
-  const ABH = 44;
-  const auxArea = svgW - PL - PR;
-  const ASTEP = aux.length > 0 ? Math.floor(auxArea / aux.length) : auxArea;
-  const ABW   = Math.min(108, ASTEP - 10);
-  const svgH  = aux.length > 0 ? AUX_Y + ABH + 18 : MAIN_Y + BH + 20;
-
-  // ── カラーパレット ──
-  const C = {
-    hdrBg:      '#f0faf6', hdrLine: '#b8e8d8',
-    mainFill:   '#e8f5f0', mainStr: '#00856a',
-    warnFill:   '#fff3e8', warnStr: '#d4621a',
-    pumpFill:   '#eef2ff', pumpStr: '#3b5bdb',
-    tankFill:   '#f0f9ff', tankStr: '#0077cc',
-    endFill:    '#ebf5ff', endStr:  '#0055aa',
-    auxFill:    '#f7f8fa', auxStr:  '#9ca3af',
-    arrow:      '#00856a',
-    txt:        '#111827', sub:     '#6b7280',
-    secLbl:     '#9ca3af', div:     '#d1d5db',
-  };
   const FF = "'Helvetica Neue',Arial,sans-serif";
+  const C = {
+    hdrBg: '#f0faf6',
+    hdrLine: '#b8e8d8',
+    secLbl: '#9ca3af',
+    txt: '#111827',
+    sub: '#6b7280',
+    arrow: '#00856a',
+    tankFill: '#eef7fb', tankStr: '#0b84d8',
+    pumpFill: '#eef2ff', pumpStr: '#4f6cf7',
+    coagFill: '#eefaf4', coagStr: '#00856a',
+    endFill: '#eef7fb', endStr: '#005fb8',
+    topFill: '#f8fafc', topStr: '#64748b'
+  };
 
-  const p = []; // SVG parts accumulator
+  const nodeW = 130;
+  const nodeH = 64;
+  const topNodeW = 116;
+  const topNodeH = 40;
+  const topGap = 14;
+  const centerStep = topNodeW + topGap;
+  const marginL = 28;
+  const marginR = 28;
+  const headerH = 84;
 
-  // Defs（矢印マーカー）
-  p.push(`<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${C.arrow}"/></marker></defs>`);
+  const hasRelay   = (d.option_tanks || []).includes('中継槽');
+  const hasMonitor = (d.option_tanks || []).includes('監視槽');
+  const noFilter   = d.filter_branches === 'ろ過しない';
 
-  // 背景
-  p.push(`<rect width="${svgW}" height="${svgH}" fill="#fff" rx="6" stroke="#e5e7eb" stroke-width="1"/>`);
+  // 原水ポンプ削除。中継槽あり：原水槽→中継槽→凝集沈殿槽
+  const rawX    = marginL;
+  const relayX  = hasRelay ? rawX + 180 : null;
+  const coagX   = hasRelay ? rawX + 360 : rawX + 200;
 
-  // ── 情報ヘッダー ──
-  p.push(`<rect x="0" y="0" width="${svgW}" height="${HDR_H}" fill="${C.hdrBg}" rx="6"/>`);
-  p.push(`<rect x="0" y="${HDR_H - 8}" width="${svgW}" height="8" fill="${C.hdrBg}"/>`);
-  p.push(`<line x1="0" y1="${HDR_H}" x2="${svgW}" y2="${HDR_H}" stroke="${C.hdrLine}" stroke-width="1"/>`);
+  // 監視槽あり：監視槽の真下にろ過装置、放流×2を縦揃え
+  const monitorX   = hasMonitor ? coagX + 200 : null;
+  const filterX    = hasMonitor ? monitorX     : coagX;
+  const dischargeX = (hasMonitor ? monitorX : coagX) + nodeW + 80;
+  const lowerX     = dischargeX;
+
+  const mainY = headerH + 178;
+  const dischargeY = mainY;
+  const filterY = mainY + 138;
+  const topY = headerH + 28;
+  const coagTopY = mainY;
+  const coagCX = coagX + nodeW / 2;
+
+  const trunc = (s, n = 12) => {
+    const str = String(s || '');
+    return str.length > n ? str.slice(0, n - 1) + '…' : str;
+  };
+  const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const count = topInputs.length;
+  let boxCenters = [];
+  if (count > 0 && count <= 4) {
+    const offsetBase = (count - 1) / 2;
+    boxCenters = topInputs.map((_, idx) => coagCX + (idx - offsetBase) * centerStep);
+  }
+
+  const specialExtent = boxCenters.length
+    ? Math.max(...boxCenters.map(x => x + topNodeW / 2)) + marginR
+    : 0;
+  const totalTopW = count > 0 ? count * topNodeW + (count - 1) * topGap : 0;
+  const baseSvgW = Math.max(700, lowerX + nodeW + marginR);
+  let svgW = Math.max(baseSvgW, specialExtent, totalTopW > 0 ? totalTopW + marginL + marginR : baseSvgW);
+  const svgH = noFilter ? filterY + nodeH + 44 : filterY + nodeH + 44;
+
+  if (count >= 5) {
+    const topStartX = Math.max(marginL, (svgW - totalTopW) / 2);
+    boxCenters = topInputs.map((_, idx) => topStartX + topNodeW / 2 + idx * centerStep);
+  }
+
+  const p = [];
+  p.push(`<defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="${C.arrow}"/>
+    </marker>
+  </defs>`);
+
+  p.push(`<rect width="${svgW}" height="${svgH}" fill="#fff" rx="8" stroke="#e5e7eb" stroke-width="1"/>`);
+  p.push(`<rect x="0" y="0" width="${svgW}" height="${headerH}" fill="${C.hdrBg}" rx="8"/>`);
+  p.push(`<rect x="0" y="${headerH - 8}" width="${svgW}" height="8" fill="${C.hdrBg}"/>`);
+  p.push(`<line x1="0" y1="${headerH}" x2="${svgW}" y2="${headerH}" stroke="${C.hdrLine}" stroke-width="1"/>`);
 
   const infoItems = [
-    ['業種',   getIndustryLabel(d.industry) || '—'],
+    ['排水種類', d.wastewater_type || '—'],
     ['排水量', d.daily_volume ? d.daily_volume + ' m³/日' : '—'],
-    ['pH',     (d.ph_min || d.ph_max) ? (d.ph_min||'?') + '〜' + (d.ph_max||'?') : '—'],
-    ['SS',     hasSS ? '高い' : '標準'],
-    ['油分',   hasOil ? 'あり' : 'なし'],
-    ['重金属', hasMetal ? metals.filter(m => m !== 'なし').join('・') : 'なし'],
+    ['装置容量', d.tank_capacity || '—'],
+    ['ろ過分岐数', d.filter_branches || '—']
   ];
   const icW = svgW / infoItems.length;
   infoItems.forEach(([k, v], i) => {
     const ix = i * icW;
-    if (i > 0) p.push(`<line x1="${ix}" y1="10" x2="${ix}" y2="${HDR_H - 6}" stroke="#cce8dc" stroke-width="1"/>`);
-    p.push(`<text x="${ix + icW/2}" y="28" text-anchor="middle" font-family="${FF}" font-size="10" fill="${C.secLbl}">${k}</text>`);
-    const dv = v.length > 13 ? v.slice(0, 12) + '…' : v;
-    p.push(`<text x="${ix + icW/2}" y="56" text-anchor="middle" font-family="${FF}" font-size="13" font-weight="700" fill="${C.txt}">${dv}</text>`);
+    if (i > 0) p.push(`<line x1="${ix}" y1="12" x2="${ix}" y2="${headerH - 8}" stroke="#cce8dc" stroke-width="1"/>`);
+    p.push(`<text x="${ix + icW / 2}" y="34" text-anchor="middle" font-family="${FF}" font-size="10" fill="${C.secLbl}">${esc(k)}</text>`);
+    p.push(`<text x="${ix + icW / 2}" y="58" text-anchor="middle" font-family="${FF}" font-size="13" font-weight="700" fill="${C.txt}">${esc(trunc(v, 16))}</text>`);
   });
 
-  // ── セクションラベル ──
-  p.push(`<text x="${PL}" y="${MAIN_Y - 5}" font-family="${FF}" font-size="9" fill="${C.secLbl}" letter-spacing="1.5">主処理ライン</text>`);
+  p.push(`<text x="${marginL}" y="${topY - 8}" font-family="${FF}" font-size="9" fill="${C.secLbl}" letter-spacing="1.5">投入要素</text>`);
+  p.push(`<text x="${marginL}" y="${mainY - 10}" font-family="${FF}" font-size="9" fill="${C.secLbl}" letter-spacing="1.5">主処理ライン</text>`);
 
-  // ── 主処理ノード ──
-  main.forEach((node, i) => {
-    const x = PL + i * STEP, y = MAIN_Y;
-    const cx = x + BW / 2;
-    let fill, str, sw;
-    switch (node.t) {
-      case 'warn': fill = C.warnFill; str = C.warnStr; sw = 1.5; break;
-      case 'pump': fill = C.pumpFill; str = C.pumpStr; sw = 1;   break;
-      case 'end':  fill = C.endFill;  str = C.endStr;  sw = 2;   break;
-      case 'tank': fill = C.tankFill; str = C.tankStr; sw = 1.5; break;
-      default:     fill = C.mainFill; str = C.mainStr; sw = 1.5;
+  const drawNode = (x, y, label, sub, type = 'main') => {
+    let fill = C.topFill, str = C.topStr, sw = 1.6;
+    if (type === 'tank') { fill = C.tankFill; str = C.tankStr; }
+    else if (type === 'pump') { fill = C.pumpFill; str = C.pumpStr; }
+    else if (type === 'coag') { fill = C.coagFill; str = C.coagStr; sw = 2; }
+    else if (type === 'end') { fill = C.endFill; str = C.endStr; sw = 2; }
+
+    p.push(`<rect x="${x}" y="${y}" width="${nodeW}" height="${nodeH}" rx="8" fill="${fill}" stroke="${str}" stroke-width="${sw}"/>`);
+    p.push(`<text x="${x + nodeW / 2}" y="${y + 24}" text-anchor="middle" font-family="${FF}" font-size="12" font-weight="700" fill="${C.txt}">${esc(label)}</text>`);
+    if (sub) {
+      p.push(`<text x="${x + nodeW / 2}" y="${y + 41}" text-anchor="middle" font-family="${FF}" font-size="10" fill="${C.sub}">${esc(sub)}</text>`);
     }
-    p.push(`<rect x="${x}" y="${y}" width="${BW}" height="${BH}" rx="${BR}" fill="${fill}" stroke="${str}" stroke-width="${sw}"/>`);
-    if (node.sub) {
-      p.push(`<text x="${cx}" y="${y + 22}" text-anchor="middle" font-family="${FF}" font-size="12" font-weight="700" fill="${C.txt}">${node.lbl}</text>`);
-      p.push(`<text x="${cx}" y="${y + 40}" text-anchor="middle" font-family="${FF}" font-size="10" fill="${C.sub}">${node.sub}</text>`);
+  };
+
+  const drawTopBox = (centerX, label) => {
+    const boxX = centerX - topNodeW / 2;
+    p.push(`<rect x="${boxX}" y="${topY}" width="${topNodeW}" height="${topNodeH}" rx="7" fill="#f8fafc" stroke="#64748b" stroke-width="1.4"/>`);
+    p.push(`<text x="${centerX}" y="${topY + 25}" text-anchor="middle" font-family="${FF}" font-size="11" font-weight="700" fill="${C.txt}">${esc(trunc(label, 12))}</text>`);
+    return { x: centerX, y: topY + topNodeH };
+  };
+
+  const drawStraightDown = (x, fromY, toY) => {
+    p.push(`<line x1="${x}" y1="${fromY}" x2="${x}" y2="${toY}" stroke="${C.arrow}" stroke-width="2.2" marker-end="url(#ah)"/>`);
+  };
+
+  const drawOrthogonalDown = (fromX, fromY, elbowY, targetX, targetY) => {
+    p.push(`<line x1="${fromX}" y1="${fromY}" x2="${fromX}" y2="${elbowY}" stroke="${C.arrow}" stroke-width="2.2"/>`);
+    p.push(`<line x1="${fromX}" y1="${elbowY}" x2="${targetX}" y2="${elbowY}" stroke="${C.arrow}" stroke-width="2.2"/>`);
+    p.push(`<line x1="${targetX}" y1="${elbowY}" x2="${targetX}" y2="${targetY}" stroke="${C.arrow}" stroke-width="2.2" marker-end="url(#ah)"/>`);
+  };
+
+  if (count > 0) {
+    const boxes = topInputs.map((item, idx) => ({ ...drawTopBox(boxCenters[idx], item), label: item }));
+
+    if (count === 1) {
+      drawStraightDown(boxes[0].x, boxes[0].y, coagTopY);
     } else {
-      p.push(`<text x="${cx}" y="${y + BH/2 + 5}" text-anchor="middle" font-family="${FF}" font-size="12" font-weight="700" fill="${C.txt}">${node.lbl}</text>`);
-    }
-    // 矢印
-    if (i < main.length - 1) {
-      const ay = y + BH / 2;
-      p.push(`<line x1="${x+BW}" y1="${ay}" x2="${x+BW+AW-3}" y2="${ay}" stroke="${C.arrow}" stroke-width="2" marker-end="url(#ah)"/>`);
-    }
-  });
+      const manifoldY = topY + topNodeH + 18;
+      const leftX = boxes[0].x;
+      const rightX = boxes[boxes.length - 1].x;
 
-  // ── 付帯設備 ──
-  if (aux.length > 0) {
-    p.push(`<line x1="${PL}" y1="${AUX_DIV_Y}" x2="${svgW-PR}" y2="${AUX_DIV_Y}" stroke="${C.div}" stroke-width="1" stroke-dasharray="5,4"/>`);
-    p.push(`<text x="${PL}" y="${AUX_LBL_Y + 12}" font-family="${FF}" font-size="9" fill="${C.secLbl}" letter-spacing="1.5">付帯設備</text>`);
-    aux.forEach((node, i) => {
-      const ax = PL + i * ASTEP, ay = AUX_Y, acx = ax + ABW / 2;
-      p.push(`<rect x="${ax}" y="${ay}" width="${ABW}" height="${ABH}" rx="5" fill="${C.auxFill}" stroke="${C.auxStr}" stroke-width="1" stroke-dasharray="4,3"/>`);
-      if (node.sub) {
-        p.push(`<text x="${acx}" y="${ay+17}" text-anchor="middle" font-family="${FF}" font-size="11" font-weight="600" fill="${C.txt}">${node.lbl}</text>`);
-        const ds = node.sub.length > 10 ? node.sub.slice(0, 9) + '…' : node.sub;
-        p.push(`<text x="${acx}" y="${ay+32}" text-anchor="middle" font-family="${FF}" font-size="9" fill="${C.sub}">${ds}</text>`);
-      } else {
-        p.push(`<text x="${acx}" y="${ay+ABH/2+4}" text-anchor="middle" font-family="${FF}" font-size="11" font-weight="600" fill="${C.txt}">${node.lbl}</text>`);
-      }
-    });
+      boxes.forEach(box => {
+        p.push(`<line x1="${box.x}" y1="${box.y}" x2="${box.x}" y2="${manifoldY}" stroke="${C.arrow}" stroke-width="2.2"/>`);
+      });
+
+      p.push(`<line x1="${leftX}" y1="${manifoldY}" x2="${rightX}" y2="${manifoldY}" stroke="${C.arrow}" stroke-width="2.2"/>`);
+      p.push(`<line x1="${coagCX}" y1="${manifoldY}" x2="${coagCX}" y2="${coagTopY}" stroke="${C.arrow}" stroke-width="2.2" marker-end="url(#ah)"/>`);
+    }
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="100%" style="display:block;min-width:${svgW}px;border-radius:6px;">${p.join('')}<\/svg>`;
+  drawNode(rawX, mainY, '原水槽', '', 'tank');
+  if (hasRelay)   drawNode(relayX,   mainY, '中継槽',   '', 'tank');
+  drawNode(coagX,  mainY, '凝集沈殿槽', 'pH調整 → 凝集 → 沈殿', 'coag');
+  if (hasMonitor) drawNode(monitorX, mainY, '監視槽',   '', 'tank');
+  drawNode(dischargeX, mainY, '放流', d.discharge_dest || '放流先', 'end');
+
+  // ろ過しない → 汚泥貯槽のみ。ろ過あり → ろ過装置＋放流
+  if (noFilter) {
+    drawNode(filterX, filterY, '汚泥貯槽', '', 'tank');
+  } else {
+    drawNode(filterX,  filterY, 'ろ過装置', 'スラッジろ過', 'coag');
+    drawNode(lowerX,   filterY, '放流', '', 'end');
+  }
+
+  const mainCy   = mainY + nodeH / 2;
+  const filterCy = filterY + nodeH / 2;
+
+  // 原水槽 → (中継槽 →) 凝集沈殿槽
+  if (hasRelay) {
+    p.push(`<line x1="${rawX + nodeW}" y1="${mainCy}" x2="${relayX - 12}" y2="${mainCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
+    p.push(`<line x1="${relayX + nodeW}" y1="${mainCy}" x2="${coagX - 12}" y2="${mainCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
+  } else {
+    p.push(`<line x1="${rawX + nodeW}" y1="${mainCy}" x2="${coagX - 12}" y2="${mainCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
+  }
+
+  // 凝集沈殿槽 → (監視槽 →) 放流（上澄液ライン）
+  if (hasMonitor) {
+    p.push(`<line x1="${coagX + nodeW}" y1="${mainCy}" x2="${monitorX - 12}" y2="${mainCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
+    p.push(`<text x="${coagX + nodeW + 8}" y="${mainCy - 6}" font-family="${FF}" font-size="10" fill="${C.sub}">上澄液</text>`);
+    p.push(`<line x1="${monitorX + nodeW}" y1="${mainCy}" x2="${dischargeX - 12}" y2="${mainCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
+  } else {
+    p.push(`<line x1="${coagX + nodeW}" y1="${mainCy}" x2="${dischargeX - 12}" y2="${mainCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
+    p.push(`<text x="${coagX + nodeW + 8}" y="${mainCy - 6}" font-family="${FF}" font-size="10" fill="${C.sub}">上澄液</text>`);
+  }
+
+  // スラッジライン：凝集沈殿槽の真下へ
+  const sludgeDnX = coagX + nodeW / 2;
+
+  if (hasMonitor) {
+    const filterInX = filterX;
+    p.push(`<line x1="${sludgeDnX}" y1="${mainY + nodeH}" x2="${sludgeDnX}" y2="${filterCy}" stroke="${C.arrow}" stroke-width="2.2"/>`);
+    p.push(`<line x1="${sludgeDnX}" y1="${filterCy}" x2="${filterInX - 12}" y2="${filterCy}" stroke="${C.arrow}" stroke-width="2.2" marker-end="url(#ah)"/>`);
+    p.push(`<text x="${sludgeDnX + 6}" y="${filterCy - 6}" font-family="${FF}" font-size="10" fill="${C.sub}">${noFilter ? '汚泥' : 'スラッジ'}</text>`);
+  } else {
+    p.push(`<line x1="${sludgeDnX}" y1="${mainY + nodeH}" x2="${sludgeDnX}" y2="${filterY - 12}" stroke="${C.arrow}" stroke-width="2.2" marker-end="url(#ah)"/>`);
+    p.push(`<text x="${sludgeDnX + 6}" y="${(mainY + nodeH + filterY) / 2}" font-family="${FF}" font-size="10" fill="${C.sub}">${noFilter ? '汚泥' : 'スラッジ'}</text>`);
+  }
+
+  // ろ過装置 → 放流（下）：ろ過しない場合は描画しない
+  if (!noFilter) {
+    p.push(`<line x1="${filterX + nodeW}" y1="${filterCy}" x2="${lowerX - 12}" y2="${filterCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" style="display:block;min-width:${svgW}px;border-radius:6px;">${p.join('')}<\/svg>`;
+}
+
+const REQUIRED_RESULT_FIELDS = [
+  ['customer_name', '顧客名'],
+  ['delivery_location', '納品場所'],
+  ['wastewater_type', '排水の種類・内容'],
+  ['daily_volume', '1日の排水量'],
+  ['tank_capacity', '排水処理装置の容量'],
+  ['filter_branches', 'ろ過分岐数'],
+  ['powder_feeder', '粉体供給機の使用'],
+  ['chemicals', '使用薬品']
+];
+
+function renderMissingCheck() {
+  const missing = REQUIRED_RESULT_FIELDS.filter(([key]) => {
+    if (key === 'delivery_location') {
+      return ![data.delivery_pref, data.delivery_city].filter(Boolean).join(' ').trim();
+    }
+    const value = data[key];
+    if (Array.isArray(value)) return value.length === 0;
+    return !String(value || '').trim();
+  }).map(([, label]) => label);
+
+  const el = document.getElementById('result-missing-check');
+  if (!el) return;
+
+  if (missing.length === 0) {
+    el.innerHTML = '<div class="missing-check-ok">✓ 概算見積もりに必要な項目は入力済みです。</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="missing-check-warn">⚠ 概算見積もりに必要な項目で、未入力のものがあります。</div>
+    <div class="missing-check-list">
+      ${missing.map(label => `<div class="missing-check-item">${label}</div>`).join('')}
+    </div>
+  `;
 }
 
 // ===== Generate Result =====
@@ -2378,7 +2842,7 @@ function generateResult() {
   // ---- ヘッダー情報 ----
   document.getElementById('result-customer-name').textContent = data.customer_name || '（顧客名未入力）';
   document.getElementById('result-delivery').textContent = data.desired_delivery ? '希望納期：' + data.desired_delivery : '';
-  document.getElementById('result-staff').textContent = data.staff_email ? '担当者：' + data.staff_email : '';
+  document.getElementById('result-staff').textContent = data.staff_name ? '担当者：' + data.staff_name : '';
   document.getElementById('result-date').textContent = '作成日：' + new Date().toLocaleDateString('ja-JP');
 
   // サブタイトル行（導入区分・納品場所）
@@ -2391,6 +2855,7 @@ function generateResult() {
 
   // ---- フロー図（SVG生成 — buildFlowSVG に委譲）----
   document.getElementById('result-flow').innerHTML = buildFlowSVG(data);
+  renderMissingCheck();
 
   // ---- データテーブル ----
   const rows = [
@@ -2398,7 +2863,7 @@ function generateResult() {
     ['導入区分', data.install_type],
     ['納品場所', [data.delivery_pref, data.delivery_city].filter(Boolean).join(' ')],
     ['希望納期', data.desired_delivery],
-    ['担当者', data.staff_email],
+    ['担当者', data.staff_name],
     ['業種・業態', getIndustryLabel(data.industry)],
     ['排水の種類・内容', data.wastewater_type],
     ['1日の排水量', data.daily_volume ? data.daily_volume + ' m³/日' : ''],
@@ -2410,12 +2875,16 @@ function generateResult() {
     ['使用薬品', (data.chemicals||[]).join('、')],
     ['薬注ポンプ台数', data.pump_count > 0 ? data.pump_count + ' 台' : ''],
     ['pH範囲', (data.ph_min || data.ph_max) ? (data.ph_min||'?') + ' 〜 ' + (data.ph_max||'?') : ''],
+    ['汚泥量', data.sludge_amount ? data.sludge_amount + ' kg' : ''],
     ['重金属', (data.metals||[]).join('、')],
     ['特定有害物質', (data.hazardous||[]).join('、')],
     ['その他汚染物質', (data.other_contam||[]).join('、')],
     ['放流先', data.discharge_dest],
-    ['都道府県', data.prefecture],
     ['排水基準の把握', data.regulation_status],
+    ['オプション（槽）', (data.option_tanks||[]).join('、')],
+    ['pH計 設置槽', (data.option_ph_tanks||[]).length > 0 ? '凝集沈殿槽（標準）' + ((data.option_ph_tanks||[]).length > 0 ? '、' + (data.option_ph_tanks||[]).join('、') : '') : '凝集沈殿槽（標準）'],
+    ['濁度計 設置槽', (data.option_turbidity_tanks||[]).join('、')],
+    ['脱水機', data.option_dehydrator + (data.option_dehydrator === '必要' && (data.dehydrator_maker || data.dehydrator_model) ? '（' + [data.dehydrator_maker, data.dehydrator_model].filter(Boolean).join(' ') + '）' : '')],
     ['原水槽', data.raw_tank ? data.raw_tank + (data.raw_tank_size ? '（' + data.raw_tank_size + ' m³）' : '') : ''],
     ['電源容量', data.power_status],
     ...((data.extra_pumps||[]).filter(Boolean).map((p,i) =>
@@ -2431,11 +2900,38 @@ function generateResult() {
     ['横引き距離（荷下ろし〜設置）', data.pipe_distance ? data.pipe_distance + ' m' : ''],
     ['段差', data.pipe_step],
     ['スロープ', data.slope_status],
+    ['STEP1メモ', data.step_notes1],
+    ['STEP2メモ', data.step_notes2],
+    ['STEP3メモ', data.step_notes3],
+    ['STEP4メモ', data.step_notes4],
     ['備考', data.notes],
   ].filter(r => r[1]);
 
   const tbody = document.querySelector('#result-data-table tbody');
   tbody.innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+
+  // ---- 薬剤テーブル ----
+  const chemSection = document.getElementById('result-chemical-section');
+  const chemTbody = document.getElementById('result-chemical-tbody');
+  const allChems = [...(data.chemicals || [])];
+  const otherSel = document.getElementById('chem_other_item')?.classList.contains('selected');
+  const otherCount = parseInt(data.chem_other_count) || (otherSel ? 1 : 0);
+  if (otherSel) {
+    for (let i = 1; i <= otherCount; i++) {
+      allChems.push(otherCount === 1 ? 'その他' : `その他 ${i}`);
+    }
+  }
+  if (chemSection && chemTbody) {
+    if (allChems.length > 0) {
+      chemTbody.innerHTML = allChems.map(c => {
+        const d = (data.chem_details || {})[c] || {name: '', amount: ''};
+        return `<tr><td>${c}</td><td>${d.name || '—'}</td><td>${d.amount || '—'}</td></tr>`;
+      }).join('');
+      chemSection.style.display = 'block';
+    } else {
+      chemSection.style.display = 'none';
+    }
+  }
 
   // ---- 確認事項ノート ----
   const notes = [];
@@ -2488,15 +2984,17 @@ function executeReset() {
     industry: '', wastewater_type: '', daily_volume: '', working_days: '', batch_count: '',
     tank_capacity: '', filter_branches: '', powder_feeder: '',
     chemicals: [], pump_count: 0, chem_other_count: '',
-    ph_min: '', ph_max: '',
+    ph_min: '', ph_max: '', sludge_amount: '',
     metals: [], hazardous: [], other_contam: [],
-    discharge_dest: '', prefecture: '', regulation_status: '',
+    discharge_dest: '', regulation_status: '',
+    option_tanks: [], option_ph_tanks: [], option_turbidity_tanks: [],
+    option_dehydrator: '', dehydrator_maker: '', dehydrator_model: '',
     raw_tank: '', raw_tank_size: '', existing_equip: [], existing_equip_other: '',
     existing_power_kw: '', power_status: '',
     extra_pumps: [],
     level_sensors: [], sensor_count: 0, sensor_other_count: '', sensor_other_note: '',
-    space_area: '', location_type: '', carry_in: [], access: [],
-    pipe_distance: '', pipe_step: '', slope_status: '', notes: ''
+    space_area: '', location_type: '', power_cable_length: '', primary_power_connection: '', carry_in: [], access: [],
+    pipe_distance: '', pipe_step: '', slope_status: '', notes: '', step_notes1: '', step_notes2: '', step_notes3: '', step_notes4: ''
   });
 
   // テキスト・数値・日付・セレクト・テキストエリアをクリア
