@@ -1,0 +1,22 @@
+name: Branch Name Check
+
+on:
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  check-branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch naming convention
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          echo "Branch: $BRANCH"
+          if [[ "$BRANCH" =~ ^(feature|fix)/.+ ]]; then
+            echo "OK: Branch name follows convention (feature/xxx or fix/xxx)"
+          else
+            echo "ERROR: Branch name '$BRANCH' does not follow the convention."
+            echo "Use: feature/<description> or fix/<description>"
+            exit 1
+          fi
