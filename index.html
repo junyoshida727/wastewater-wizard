@@ -1290,7 +1290,7 @@
           </div>
           <div>
             <div class="field-label">担当者名</div>
-            <input type="text" id="staff_email" placeholder="担当者のお名前" oninput="updateData('staff_email', this.value)">
+            <input type="text" id="staff_name" placeholder="担当者のお名前" oninput="updateData('staff_name', this.value)">
           </div>
         </div>
       </div>
@@ -1869,7 +1869,7 @@
         <!-- 左：上澄み直接放流 -->
         <div style="display:flex; flex-direction:column; align-items:center;">
           <div class="flow-arrow active-arrow"></div>
-          <div class="flow-node active-node" style="font-size:11px; min-width:100px;">上澄み液<div class="node-label">直接放流</div></div>
+          <div class="flow-node active-node" id="fn-discharge" style="font-size:11px; min-width:100px;">上澄み液<div class="node-label">直接放流</div></div>
         </div>
         <!-- 右：ろ過スタンド経由 -->
         <div style="display:flex; flex-direction:column; align-items:center;">
@@ -1968,12 +1968,12 @@
 <script>
 // ===== State =====
 const data = {
-  customer_name: '', desired_delivery: '', staff_email: '',
+  customer_name: '', desired_delivery: '', staff_name: '',
   install_type: '', delivery_pref: '', delivery_city: '',
   industry: '', wastewater_type: '', daily_volume: '', working_days: '', batch_count: '',
   tank_capacity: '', filter_branches: '', powder_feeder: '',
   chemicals: [], pump_count: 0, chem_other_count: '', chem_details: {},
-  ph_min: '', ph_max: '', sludge_amount: '',
+  ph_min: '', ph_max: '', raw_water_temp: '', sludge_amount: '',
   metals: [], hazardous: [], other_contam: [],
   discharge_dest: '', regulation_status: '',
   option_tanks: [], option_ph_tanks: [], option_turbidity_tanks: [],
@@ -2039,6 +2039,7 @@ function resumeDraft() {
   if (!payload) return;
   _restoring = true;
   Object.assign(data, payload.data);
+  if (!data.staff_name && data.staff_email) data.staff_name = data.staff_email;
   _restoreUI(payload.step || 1);
   _restoring = false;
   banner.style.display = 'none';
@@ -2053,10 +2054,10 @@ function discardDraft() {
 // UI全体を data オブジェクトの値から再構築する
 function _restoreUI(targetStep) {
   // ── テキスト・数値・日付系 ──
-  ['customer_name','desired_delivery','staff_email','delivery_city',
+  ['customer_name','desired_delivery','staff_name','delivery_city',
    'wastewater_type','daily_volume','working_days','raw_tank_size',
    'space_area','power_cable_length','pipe_distance','pipe_step','notes','sensor_other_note',
-   'dehydrator_maker','dehydrator_model','sludge_amount',
+   'dehydrator_maker','dehydrator_model','raw_water_temp','sludge_amount',
    'step_notes1','step_notes2','step_notes3','step_notes4'
   ].forEach(key => {
     const el = document.getElementById(key);
@@ -2154,15 +2155,14 @@ function _restoreUI(targetStep) {
   savedPumps.forEach(pump => {
     const idx = pumpRowCount++;
     data.extra_pumps.push({ ...pump });
-    const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
     const tr = document.createElement('tr');
     tr.id = 'pump-row-' + idx;
     tr.style.borderBottom = '1px solid var(--border)';
     tr.innerHTML = `
-      <td style="padding:4px;"><input type="text" placeholder="例: 移送ポンプ" style="width:100%;" oninput="updateExtraPump(${idx},'name',this.value)" value="${esc(pump.name)}"></td>
-      <td style="padding:4px;"><input type="number" min="0" placeholder="1" style="width:52px;text-align:center;" oninput="updateExtraPump(${idx},'count',this.value)" value="${esc(pump.count)}"></td>
-      <td style="padding:4px;"><input type="number" min="0" step="0.1" placeholder="0.1" style="width:72px;text-align:center;" oninput="updateExtraPump(${idx},'lph',this.value)" value="${esc(pump.lph)}"></td>
-      <td style="padding:4px;"><input type="number" min="0" step="0.1" placeholder="—" style="width:72px;text-align:center;" oninput="updateExtraPump(${idx},'amp',this.value)" value="${esc(pump.amp)}"></td>
+      <td style="padding:4px;"><input type="text" placeholder="例: 移送ポンプ" style="width:100%;" oninput="updateExtraPump(${idx},'name',this.value)" value="${escapeAttr(pump.name)}"></td>
+      <td style="padding:4px;"><input type="number" min="0" placeholder="1" style="width:52px;text-align:center;" oninput="updateExtraPump(${idx},'count',this.value)" value="${escapeAttr(pump.count)}"></td>
+      <td style="padding:4px;"><input type="number" min="0" step="0.1" placeholder="0.1" style="width:72px;text-align:center;" oninput="updateExtraPump(${idx},'lph',this.value)" value="${escapeAttr(pump.lph)}"></td>
+      <td style="padding:4px;"><input type="number" min="0" step="0.1" placeholder="—" style="width:72px;text-align:center;" oninput="updateExtraPump(${idx},'amp',this.value)" value="${escapeAttr(pump.amp)}"></td>
       <td style="padding:4px;text-align:center;"><button type="button" onclick="removePumpRow(${idx})" style="background:none;border:none;color:var(--warn);cursor:pointer;font-size:16px;">✕</button></td>`;
     document.getElementById('extra-pump-rows').appendChild(tr);
   });
@@ -2203,12 +2203,32 @@ function updateData(key, value) {
   updateSummary();
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+
 function selectRadio(key, value, el) {
   data[key] = value;
   el.closest('.radio-grid').querySelectorAll('.radio-item').forEach(e => e.classList.remove('selected'));
   el.classList.add('selected');
   updateSummary();
 }
+
+const EXCLUSIVE_CHECK_VALUES = {
+  metals: 'なし',
+  hazardous: 'なし',
+  other_contam: 'なし/不明',
+  carry_in: 'なし'
+};
 
 function toggleCheck(key, value, el) {
   // selectedトグル
@@ -2225,14 +2245,32 @@ function toggleCheck(key, value, el) {
   } else {
     data[key] = data[key].filter(v => v !== value);
   }
+
+  const exclusiveValue = EXCLUSIVE_CHECK_VALUES[key];
+  if (isNowSelected && exclusiveValue) {
+    const container = el.closest('.check-grid');
+    if (value === exclusiveValue) {
+      data[key] = [exclusiveValue];
+      container?.querySelectorAll('.check-item').forEach(item => {
+        if (item === el) return;
+        item.classList.remove('selected');
+        const itemBox = item.querySelector('.check-box');
+        if (itemBox) itemBox.textContent = '';
+      });
+    } else if (data[key].includes(exclusiveValue)) {
+      data[key] = data[key].filter(v => v !== exclusiveValue);
+      container?.querySelectorAll('.check-item').forEach(item => {
+        const handler = item.getAttribute('onclick') || '';
+        if (!handler.includes(`'${exclusiveValue}'`)) return;
+        item.classList.remove('selected');
+        const itemBox = item.querySelector('.check-box');
+        if (itemBox) itemBox.textContent = '';
+      });
+    }
+  }
+
   updateFlowPreview();
   updateSummary();
-}
-
-function toggleCheckWithInput(key, value, el, inputId) {
-  toggleCheck(key, value, el);
-  const wrap = document.getElementById(inputId.replace('_text', '_wrap'));
-  if (wrap) wrap.style.display = el.classList.contains('selected') ? 'block' : 'none';
 }
 
 // ===== Navigation =====
@@ -2249,6 +2287,7 @@ function goStep(n) {
   document.getElementById('step-counter').textContent = 'STEP ' + n + ' / 5';
   document.getElementById('progress-fill').style.width = (n * 20) + '%';
   updateFlowPreview();
+  saveToLocalStorage();
 }
 
 // ===== Flow Preview Logic =====
@@ -2269,8 +2308,9 @@ function updateFlowPreview() {
   setArrow('fa-fluorine', hasFluorine);
 
   // 放流先ラベル更新
-  if (data.discharge_dest) {
-    document.querySelector('#fn-discharge .node-label').textContent = data.discharge_dest + 'へ';
+  const dischargeLabel = document.querySelector('#fn-discharge .node-label');
+  if (data.discharge_dest && dischargeLabel) {
+    dischargeLabel.textContent = data.discharge_dest + 'へ';
   }
 }
 
@@ -2289,11 +2329,6 @@ function setArrow(id, show) {
   el.className = 'flow-arrow' + (show ? ' active-arrow' : '');
 }
 
-function activateArrows() {
-  // fa1 is always between raw and first visible node
-  document.getElementById('fa1').className = 'flow-arrow active-arrow';
-}
-
 // ===== Summary =====
 function updateSummary() {
   const rows = [
@@ -2308,8 +2343,8 @@ function updateSummary() {
 
   const html = rows.map(r => `
     <div class="data-row">
-      <span class="data-key">${r[0]}</span>
-      <span class="data-val">${r[1]}</span>
+      <span class="data-key">${escapeHtml(r[0])}</span>
+      <span class="data-val">${escapeHtml(r[1])}</span>
     </div>`).join('');
   document.getElementById('data-summary').innerHTML = html;
   saveToLocalStorage();
@@ -2495,13 +2530,12 @@ function updateChemDetailsTable() {
   if (allChems.length === 0) { area.style.display = 'none'; return; }
   area.style.display = 'block';
 
-  const esc = s => (s || '').replace(/"/g, '&quot;');
   tbody.innerHTML = allChems.map(c => {
     const d = data.chem_details[c] || {name: '', amount: ''};
     return `<tr>
-      <td>${c}</td>
-      <td><input class="chem-detail-input" type="text" placeholder="例：硫酸" value="${esc(d.name)}" oninput="updateChemDetail('${c}','name',this.value)"></td>
-      <td><input class="chem-detail-input" type="text" placeholder="例：50 mL/m³" value="${esc(d.amount)}" oninput="updateChemDetail('${c}','amount',this.value)"></td>
+      <td>${escapeHtml(c)}</td>
+      <td><input class="chem-detail-input" type="text" placeholder="例：硫酸" value="${escapeAttr(d.name)}" oninput="updateChemDetail('${c}','name',this.value)"></td>
+      <td><input class="chem-detail-input" type="text" placeholder="例：50 mL/m³" value="${escapeAttr(d.amount)}" oninput="updateChemDetail('${c}','amount',this.value)"></td>
     </tr>`;
   }).join('');
 }
@@ -2875,6 +2909,7 @@ function generateResult() {
     ['使用薬品', (data.chemicals||[]).join('、')],
     ['薬注ポンプ台数', data.pump_count > 0 ? data.pump_count + ' 台' : ''],
     ['pH範囲', (data.ph_min || data.ph_max) ? (data.ph_min||'?') + ' 〜 ' + (data.ph_max||'?') : ''],
+    ['原水水温', data.raw_water_temp ? data.raw_water_temp + ' ℃' : ''],
     ['汚泥量', data.sludge_amount ? data.sludge_amount + ' kg' : ''],
     ['重金属', (data.metals||[]).join('、')],
     ['特定有害物質', (data.hazardous||[]).join('、')],
@@ -2908,7 +2943,7 @@ function generateResult() {
   ].filter(r => r[1]);
 
   const tbody = document.querySelector('#result-data-table tbody');
-  tbody.innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+  tbody.innerHTML = rows.map(r => `<tr><td>${escapeHtml(r[0])}</td><td>${escapeHtml(r[1])}</td></tr>`).join('');
 
   // ---- 薬剤テーブル ----
   const chemSection = document.getElementById('result-chemical-section');
@@ -2925,7 +2960,7 @@ function generateResult() {
     if (allChems.length > 0) {
       chemTbody.innerHTML = allChems.map(c => {
         const d = (data.chem_details || {})[c] || {name: '', amount: ''};
-        return `<tr><td>${c}</td><td>${d.name || '—'}</td><td>${d.amount || '—'}</td></tr>`;
+        return `<tr><td>${escapeHtml(c)}</td><td>${escapeHtml(d.name || '—')}</td><td>${escapeHtml(d.amount || '—')}</td></tr>`;
       }).join('');
       chemSection.style.display = 'block';
     } else {
@@ -2939,7 +2974,7 @@ function generateResult() {
   if (hasChromium6) notes.push({icon:'⚠', text:'六価クロムは還元処理が必要です。凝集沈殿槽の前段に還元槽を設置します。'});
   if (hasFluorine) notes.push({icon:'⚠', text:'フッ素はカルシウム添加による不溶化処理が必要です。凝集沈殿槽の後段に設置します。'});
   if (hasMetal) notes.push({icon:'✓', text:'重金属は凝集沈殿槽内でpH調整→凝集剤投入→沈殿により除去します。'});
-  if (!data.raw_tank || data.raw_tank === 'なし（新設必要）') notes.push({icon:'⚠', text:'原水槽が未設置です。バッチ式処理の安定化のために原水槽の新設を推奨します。'});
+  if (!data.raw_tank || data.raw_tank === 'なし') notes.push({icon:'⚠', text:'原水槽が未設置です。バッチ式処理の安定化のために原水槽の新設を推奨します。'});
   if (data.pipe_distance && parseFloat(data.pipe_distance) > 10) notes.push({icon:'⚠', text:'横引き距離が長い場合、配管工事費が増加する可能性があります。現地確認を推奨します。'});
   if (data.carry_in && data.carry_in.includes('なし')) notes.push({icon:'⚠', text:'搬入機材がない場合、分割搬入や手搬入対応設備の検討が必要です。'});
   notes.push({icon:'✓', text:'本フローはヒアリング情報に基づく暫定提案です。実際の設計・見積は詳細調査後に確定します。'});
@@ -2979,12 +3014,12 @@ function closeResetModal() {
 function executeReset() {
   // dataオブジェクトをリセット
   Object.assign(data, {
-    customer_name: '', desired_delivery: '', staff_email: '',
+    customer_name: '', desired_delivery: '', staff_name: '',
     install_type: '', delivery_pref: '', delivery_city: '',
     industry: '', wastewater_type: '', daily_volume: '', working_days: '', batch_count: '',
     tank_capacity: '', filter_branches: '', powder_feeder: '',
-    chemicals: [], pump_count: 0, chem_other_count: '',
-    ph_min: '', ph_max: '', sludge_amount: '',
+    chemicals: [], pump_count: 0, chem_other_count: '', chem_details: {},
+    ph_min: '', ph_max: '', raw_water_temp: '', sludge_amount: '',
     metals: [], hazardous: [], other_contam: [],
     discharge_dest: '', regulation_status: '',
     option_tanks: [], option_ph_tanks: [], option_turbidity_tanks: [],
