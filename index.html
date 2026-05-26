@@ -2892,6 +2892,11 @@ function generateResult() {
   renderMissingCheck();
 
   // ---- データテーブル ----
+  const sensorSummary = [
+    ...(data.level_sensors || []),
+    ...(data.sensor_other_note ? ['その他（' + data.sensor_other_note + '）'] : [])
+  ].join('、');
+
   const rows = [
     ['顧客名', data.customer_name],
     ['導入区分', data.install_type],
@@ -2925,9 +2930,7 @@ function generateResult() {
     ...((data.extra_pumps||[]).filter(Boolean).map((p,i) =>
       [`追加ポンプ${i+1}`, [p.name, p.count ? p.count+'台' : '', p.lph ? p.lph+'kW' : '', p.amp ? p.amp+'A' : ''].filter(Boolean).join(' / ')]
     )),
-    ['レベルセンサー', data.level_sensors?.length > 0 || data.sensor_count > 0
-      ? [...(data.level_sensors||[]), ...(data.sensor_other_note ? ['その他（'+data.sensor_other_note+'）'] : [])].join('、') + '（計' + data.sensor_count + '台）'
-      : ''],
+    ['レベルセンサー', sensorSummary],
     ['設置スペース', data.space_area ? data.space_area + ' ㎡' : ''],
     ['設置環境', data.location_type],
     ['搬入機材', (data.carry_in||[]).join('、')],
