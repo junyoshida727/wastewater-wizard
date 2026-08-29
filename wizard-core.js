@@ -52,7 +52,11 @@
     ARRAY_FIELDS.forEach((field) => {
       normalized[field] = asArray(source[field]);
     });
-    normalized.extra_pumps = Array.isArray(source.extra_pumps) ? source.extra_pumps.filter(Boolean) : [];
+    // Keep deleted row placeholders while the wizard is open. The DOM uses the
+    // original row index for subsequent edits, so compacting this array corrupts data.
+    normalized.extra_pumps = Array.isArray(source.extra_pumps)
+      ? source.extra_pumps.map((pump) => pump && typeof pump === 'object' ? pump : null)
+      : [];
     normalized.chem_details = source.chem_details && typeof source.chem_details === 'object' ? source.chem_details : {};
 
     // Older drafts stored the ambiguous choice as "なし".
@@ -140,15 +144,15 @@
     if (isPresent(data.working_days) && (!Number.isFinite(Number(data.working_days)) || Number(data.working_days) < 1 || Number(data.working_days) > 31)) {
       errors.push('稼働日数は1から31の範囲で入力してください。');
     }
-    if (isPresent(data.sludge_amount) && (!Number.isFinite(Number(data.sludge_amount)) || Number(data.sludge_amount) <= 0)) {
-      errors.push('汚泥量は0より大きい数値で入力してください。');
+    if (isPresent(data.sludge_amount) && (!Number.isFinite(Number(data.sludge_amount)) || Number(data.sludge_amount) < 0)) {
+      errors.push('汚泥量は0以上の数値で入力してください。');
     }
     if (data.raw_tank !== 'あり' && isPresent(data.raw_tank_size)) {
       errors.push('原水槽のサイズは、原水槽が「あり」の場合のみ入力してください。');
     }
-    ['option_ph_tanks', 'option_turbidity_tanks'].forEach((field) => {
+    [['option_ph_tanks', 'pH計'], ['option_turbidity_tanks', '濁度計']].forEach(([field, label]) => {
       const invalid = asArray(data[field]).filter((tank) => !asArray(data.option_tanks).includes(tank));
-      if (invalid.length) errors.push('計器の設置槽は、選択した槽に合わせてください。');
+      if (invalid.length) warnings.push(`${label}の設置槽（${invalid.join('、')}）がオプション槽に含まれていません。内容を確認してください。`);
     });
     if (data.chem_other_selected && getOtherChemicalKeys(data).length === 0) {
       errors.push('その他の薬品を選択した場合は、薬注ポンプ台数を選択してください。');

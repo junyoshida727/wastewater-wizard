@@ -50,16 +50,35 @@ test('stale legacy chemical detail does not reactivate a deselected other chemic
   assert.equal(data.chem_other_selected, false);
 });
 
-test('validation rejects unsafe numeric and equipment-state contradictions', () => {
+test('deleted extra pump placeholders remain aligned with open form rows', () => {
+  const data = core.normalizeData({
+    extra_pumps: [
+      null,
+      { name: 'B', count: '2', lph: '', amp: '' },
+      { name: 'C', count: '3', lph: '', amp: '' }
+    ]
+  });
+  assert.equal(data.extra_pumps.length, 3);
+  assert.equal(data.extra_pumps[0], null);
+  assert.equal(data.extra_pumps[1].name, 'B');
+  assert.equal(data.extra_pumps[2].name, 'C');
+});
+
+test('validation rejects unsafe numeric contradictions and warns about instrument tank mismatches', () => {
   const invalid = core.normalizeData({
     ph_min: '11', ph_max: '2', raw_tank: 'なし', raw_tank_size: '3',
     option_tanks: [], option_ph_tanks: ['中継槽'], daily_volume: '0'
   });
-  const { errors } = core.validateData(invalid);
+  const { errors, warnings } = core.validateData(invalid);
   assert.ok(errors.some(message => message.includes('最小値')));
   assert.ok(errors.some(message => message.includes('原水槽のサイズ')));
-  assert.ok(errors.some(message => message.includes('計器の設置槽')));
+  assert.ok(warnings.some(message => message.includes('pH計の設置槽（中継槽）')));
   assert.ok(errors.some(message => message.includes('1日の排水量')));
+});
+
+test('validation accepts zero sludge amount', () => {
+  const { errors } = core.validateData(core.normalizeData({ sludge_amount: '0' }));
+  assert.equal(errors.some(message => message.includes('汚泥量')), false);
 });
 
 test('other sensor count is retained in the result summary', () => {

@@ -21,6 +21,12 @@ test('restoration and PDF include the previously omitted safety-critical fields'
   assert.doesNotMatch(html, /cdnjs\.cloudflare\.com\/ajax\/libs\/html2pdf/);
 });
 
+test('saving a draft does not replace active pump row indexes', () => {
+  assert.equal(html.includes('Object.assign(data, normalized);'), false);
+  assert.ok(html.includes("data.sludge_amount !== '' ? data.sludge_amount + ' kg' : ''"));
+  assert.equal(html.includes('Content-Security-Policy'), false);
+});
+
 test('inline application script has valid JavaScript syntax', () => {
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
   assert.equal(scripts.length, 1);
