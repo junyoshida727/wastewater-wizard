@@ -37,26 +37,38 @@ npm run dev
 | ブランチ | 用途 |
 |---|---|
 | `main` | 本番（GitHub Pages への自動デプロイ対象） |
-| `dev` | 開発作業用。機能追加・修正はここで行う |
+| `dev` | レビュー済み変更を集約する開発ブランチ |
+| `feature/*` | 新機能開発 |
+| `fix/*` | バグ修正 |
+| `chore/*` | 開発環境・CI・依存関係などの整備 |
+| `docs/*` | ドキュメントのみの変更 |
+| `codex/*` | Codex主導の環境整備・保守作業 |
 
 ### 開発フロー
 
 ```
-dev ブランチで開発
+dev から作業ブランチを作成
     ↓
-動作確認（npm run dev）
+実装・動作確認・npm test
     ↓
-main へマージ
+Pull Request を作成してレビュー
+    ↓
+dev へマージ
+    ↓
+本番反映時に dev → main へマージ
     ↓
 GitHub Actions が自動でデプロイ
 ```
+
+詳しい運用ルールは [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) を参照してください。
+Codex は [AGENTS.md](./AGENTS.md)、Claude Code は [CLAUDE.md](./CLAUDE.md) を共通ルールとして参照します。
 
 ---
 
 ## デプロイ
 
-`main` ブランチへのプッシュで GitHub Actions が自動起動し、GitHub Pages へデプロイされます。
-設定ファイル: `.github/workflows/deploy.yml`
+本番反映は `main` ブランチへの反映後に GitHub Pages で公開されます。
+GitHub Actions を利用する場合は `.github/workflows/deploy.yml` を追加して運用します。
 
 **本番URL**: https://junyoshida727.github.io/wastewater-wizard/
 

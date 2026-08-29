@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "排水処理ヒアリングシステム — 単一HTMLファイル構成のウィザード型ヒアリングシート",
   "scripts": {
-    "dev": "live-server --port=3000 --open=index.html"
+    "dev": "live-server --port=3000 --open=index.html",
+    "test": "node --test tests/*.test.mjs"
   },
   "repository": {
     "type": "git",
