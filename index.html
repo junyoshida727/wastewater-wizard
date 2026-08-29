@@ -3,10 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
 <title>排水処理 ヒアリングシート</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap');
-
   :root {
     --bg: #0f1117;
     --surface: #1a1d27;
@@ -23,7 +22,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    font-family: 'Noto Sans JP', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
@@ -398,6 +397,7 @@
   .draft-banner-text { flex: 1; line-height: 1.5; }
   .draft-banner-text strong { color: var(--accent2); }
   .draft-banner-time { color: var(--text3); margin-left: 6px; font-size: 12px; }
+  #draft-selector { width: min(320px, 36vw); min-height: 32px; font-size: 12px; }
   .btn-resume {
     padding: 6px 16px;
     background: var(--accent2);
@@ -898,6 +898,9 @@
     header { padding: 10px 16px; gap: 8px; flex-wrap: wrap; min-height: 52px; }
     header h1 { font-size: 13px; }
     .btn-reset { padding: 8px 12px; font-size: 12px; min-height: 44px; }
+    .draft-banner { padding: 10px 16px; flex-wrap: wrap; }
+    .draft-banner-text { flex-basis: calc(100% - 32px); }
+    #draft-selector { width: 100%; min-height: 44px; }
     .save-indicator { display: none; } /* スペース節約 */
 
     /* === レイアウト: ページ全体スクロール方式に変更 ===
@@ -1111,12 +1114,16 @@
     }
     .flow-result-title { font-size: 8pt !important; margin-bottom: 8px !important; color: #333 !important; }
 
-    /* PDF出力時のみフロー図を縮小して紙幅に収める */
+    /* SVGのviewBoxを使って紙幅へ収める。固定倍率は薬剤数で切れるため使わない。 */
     #result-flow {
       overflow: visible !important;
-      transform: scale(0.55);
-      transform-origin: top left;
-      margin-bottom: -120px !important;
+      transform: none !important;
+      margin-bottom: 0 !important;
+    }
+    #result-flow svg {
+      width: 100% !important;
+      min-width: 0 !important;
+      height: auto !important;
     }
 
     .fh-node {
@@ -1134,19 +1141,16 @@
     .fh-arrow { background: #00856a !important; width: 16px !important; }
     .fh-arrow::after { border-left-color: #00856a !important; }
 
-    /* データテーブルとノートを横並び2カラム */
+    /* 長いヒアリング表は自然に改ページさせ、内容を欠かさない。 */
     .data-table-section, .notes-section {
-      display: inline-block !important;
-      width: 49% !important;
-      vertical-align: top !important;
+      display: block !important;
+      width: 100% !important;
       background: #f7f7f7 !important;
       border: 1px solid #ccc !important;
       padding: 8px !important;
-      margin-bottom: 0 !important;
+      margin-bottom: 8px !important;
       box-sizing: border-box !important;
-      break-inside: avoid;
     }
-    .data-table-section { margin-right: 1% !important; }
 
     .flow-result-title, .notes-title {
       font-size: 8pt !important;
@@ -1175,6 +1179,7 @@
       box-sizing: border-box !important;
       break-inside: avoid;
     }
+    .chemical-section.is-empty { display: none !important; }
     .chemical-table { font-size: 8pt !important; width: 100% !important; }
     .chemical-table th { font-size: 7pt !important; padding: 3px 6px !important; background: #00856a !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .chemical-table td { padding: 3px 6px !important; color: #111 !important; }
@@ -1214,7 +1219,7 @@
   }
   .tooltip-wrap:hover .tooltip-text { display: block; }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="wizard-core.js"></script>
 </head>
 <body>
 
@@ -1222,6 +1227,7 @@
   <span class="logo">WW-SURVEY</span>
   <span style="color:var(--border)">|</span>
   <h1>排水処理 ヒアリングウィザード</h1>
+  <button class="btn-reset" onclick="startNewDraft()">＋ 新規案件</button>
   <button class="btn-reset" onclick="confirmReset()">🗑 初期化</button>
   <span class="save-indicator" id="save-indicator">✓ 保存済み</span>
   <span style="font-size:12px; color:var(--text3); font-family:'Space Mono',monospace;" id="step-counter">STEP 1 / 5</span>
@@ -1234,11 +1240,12 @@
 <div id="draft-banner" class="draft-banner">
   <span style="font-size:18px; flex-shrink:0;">📂</span>
   <div class="draft-banner-text">
-    <strong>前回の入力内容があります</strong>
+    <strong id="draft-banner-title">保存済みの案件があります</strong>
     <span class="draft-banner-time" id="draft-banner-time"></span>
   </div>
+  <select id="draft-selector" onchange="selectDraft(this.value)" aria-label="再開する案件"></select>
   <button class="btn-resume" onclick="resumeDraft()">▶ 再開する</button>
-  <button class="btn-discard" onclick="discardDraft()">破棄する</button>
+  <button class="btn-discard" onclick="discardDraft()">削除する</button>
 </div>
 
 <div class="container" id="main-container">
@@ -1499,7 +1506,7 @@
           <div class="check-item" onclick="toggleCheck('hazardous', 'シアン(CN)', this)"><div class="check-box"></div>シアン (CN)</div>
           <div class="check-item" onclick="toggleCheck('hazardous', 'フッ素(F)', this)"><div class="check-box"></div>フッ素 (F)</div>
           <div class="check-item" onclick="toggleCheck('hazardous', '六価クロム(Cr6+)', this)"><div class="check-box"></div>六価クロム (Cr⁶⁺)</div>
-          <div class="check-item" onclick="toggleCheck('hazardous', 'なし', this)"><div class="check-box"></div>なし/不明</div>
+          <div class="check-item" onclick="toggleCheck('hazardous', 'なし/不明', this)"><div class="check-box"></div>なし/不明</div>
         </div>
       </div>
 
@@ -1675,7 +1682,7 @@
       <div class="field-group" id="raw_tank_size_group">
         <div class="field-label">原水槽のサイズ（あり の場合）</div>
         <div class="input-with-unit">
-          <input type="number" id="raw_tank_size" placeholder="例: 3" oninput="updateData('raw_tank_size', this.value)">
+          <input type="number" id="raw_tank_size" placeholder="例: 3" min="0" oninput="updateData('raw_tank_size', this.value)">
           <span class="unit">m³</span>
         </div>
       </div>
@@ -1766,7 +1773,7 @@
       <div class="field-group">
         <div class="field-label">設置スペース（概算）</div>
         <div class="input-with-unit">
-          <input type="number" id="space_area" placeholder="例: 10" oninput="updateData('space_area', this.value)">
+          <input type="number" id="space_area" placeholder="例: 10" min="0" oninput="updateData('space_area', this.value)">
           <span class="unit">㎡</span>
         </div>
       </div>
@@ -1823,7 +1830,7 @@
           <div>
             <div style="font-size:12px; color:var(--text2); margin-bottom:6px;">横引き距離（荷下ろし場所〜設置場所）</div>
             <div class="input-with-unit">
-              <input type="number" id="pipe_distance" placeholder="例: 5" oninput="updateData('pipe_distance', this.value)">
+              <input type="number" id="pipe_distance" placeholder="例: 5" min="0" oninput="updateData('pipe_distance', this.value)">
               <span class="unit">m</span>
             </div>
           </div>
@@ -1967,62 +1974,132 @@
 
 <script>
 // ===== State =====
-const data = {
-  customer_name: '', desired_delivery: '', staff_name: '',
-  install_type: '', delivery_pref: '', delivery_city: '',
-  industry: '', wastewater_type: '', daily_volume: '', working_days: '', batch_count: '',
-  tank_capacity: '', filter_branches: '', powder_feeder: '',
-  chemicals: [], pump_count: 0, chem_other_count: '', chem_details: {},
-  ph_min: '', ph_max: '', raw_water_temp: '', sludge_amount: '',
-  metals: [], hazardous: [], other_contam: [],
-  discharge_dest: '', regulation_status: '',
-  option_tanks: [], option_ph_tanks: [], option_turbidity_tanks: [],
-  option_dehydrator: '', dehydrator_maker: '', dehydrator_model: '',
-  raw_tank: '', raw_tank_size: '', existing_equip: [], existing_equip_other: '',
-  existing_power_kw: '', power_status: '',
-  extra_pumps: [],
-  level_sensors: [], sensor_count: 0, sensor_other_count: '', sensor_other_note: '',
-  space_area: '', location_type: '', power_cable_length: '', primary_power_connection: '', carry_in: [], access: [],
-  pipe_distance: '', pipe_step: '', slope_status: '', notes: '', step_notes1: '', step_notes2: '', step_notes3: '', step_notes4: ''
-};
+const data = WizardCore.createInitialData();
 
 let currentStep = 1;
 let _restoring = false; // 復元中はsaveToLocalStorageをスキップ
 
 // ===== LocalStorage Auto-Save =====
-const LS_KEY = 'ww-draft';
+const LEGACY_LS_KEY = 'ww-draft';
+const DRAFTS_KEY = 'ww-drafts-v2';
+const DRAFT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+let activeDraftId = null;
+let selectedDraftId = null;
+
+function newDraftId() {
+  return window.crypto?.randomUUID?.() || `draft-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function getDrafts() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(DRAFTS_KEY) || '[]');
+    const drafts = Array.isArray(stored) ? stored : [];
+    return drafts.filter(draft => draft && draft.data && Date.now() - Number(draft.savedAt || 0) < DRAFT_RETENTION_MS);
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveDrafts(drafts) {
+  localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+}
+
+function migrateLegacyDraft() {
+  try {
+    const raw = localStorage.getItem(LEGACY_LS_KEY);
+    if (!raw || getDrafts().length) return;
+    const legacy = JSON.parse(raw);
+    if (!legacy?.data) return;
+    const migrated = {
+      id: newDraftId(),
+      version: 2,
+      data: WizardCore.normalizeData(legacy.data),
+      step: legacy.step || 1,
+      savedAt: legacy.savedAt || Date.now()
+    };
+    saveDrafts([migrated]);
+    localStorage.removeItem(LEGACY_LS_KEY);
+  } catch (e) {}
+}
+
+function draftLabel(draft) {
+  const customer = draft.data?.customer_name?.trim() || '顧客名未入力';
+  const time = new Date(draft.savedAt).toLocaleString('ja-JP');
+  return `${customer}（${time}）`;
+}
+
+function renderDraftBanner(drafts = getDrafts()) {
+  const banner = document.getElementById('draft-banner');
+  const selector = document.getElementById('draft-selector');
+  if (!banner || !selector) return;
+  const ordered = drafts.slice().sort((a, b) => Number(b.savedAt) - Number(a.savedAt));
+  if (!ordered.length) {
+    banner.style.display = 'none';
+    return;
+  }
+  selector.replaceChildren();
+  ordered.forEach(draft => {
+    const option = document.createElement('option');
+    option.value = draft.id;
+    option.textContent = draftLabel(draft);
+    selector.appendChild(option);
+  });
+  selectedDraftId = ordered.some(draft => draft.id === selectedDraftId) ? selectedDraftId : ordered[0].id;
+  selector.value = selectedDraftId;
+  selectDraft(selectedDraftId, ordered);
+  banner.style.display = 'flex';
+}
+
+function selectDraft(id, drafts = getDrafts()) {
+  selectedDraftId = id;
+  const draft = drafts.find(item => item.id === id);
+  const timeEl = document.getElementById('draft-banner-time');
+  const titleEl = document.getElementById('draft-banner-title');
+  if (titleEl) titleEl.textContent = draft ? `${draft.data.customer_name || '顧客名未入力'} の下書き` : '保存済みの案件があります';
+  if (timeEl) timeEl.textContent = draft?.savedAt ? `（${_elapsedLabel(draft.savedAt)}）` : '';
+}
 
 function saveToLocalStorage() {
   if (_restoring) return;
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify({ data, step: currentStep, savedAt: Date.now() }));
+    activeDraftId ||= newDraftId();
+    const savedAt = Date.now();
+    const normalized = WizardCore.normalizeData(data);
+    Object.assign(data, normalized);
+    const drafts = getDrafts().filter(draft => draft.id !== activeDraftId);
+    drafts.push({ id: activeDraftId, version: 2, data: normalized, step: currentStep, savedAt });
+    saveDrafts(drafts);
     flashSaveIndicator();
-  } catch(e) { /* localStorage 使用不可 or 容量超過 */ }
+  } catch(e) {
+    const el = document.getElementById('save-indicator');
+    if (el) {
+      el.textContent = '保存できません';
+      el.classList.add('visible');
+    }
+  }
 }
 
 function clearLocalStorage() {
-  try { localStorage.removeItem(LS_KEY); } catch(e) {}
+  try {
+    if (!activeDraftId) return;
+    saveDrafts(getDrafts().filter(draft => draft.id !== activeDraftId));
+  } catch(e) {}
 }
 
 function flashSaveIndicator() {
   const el = document.getElementById('save-indicator');
   if (!el) return;
+  el.textContent = '✓ 保存済み';
   el.classList.add('visible');
   clearTimeout(el._timer);
   el._timer = setTimeout(() => el.classList.remove('visible'), 2000);
 }
 
 function loadFromLocalStorage() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return;
-    const payload = JSON.parse(raw);
-    if (!payload || !payload.data) return;
-    const banner = document.getElementById('draft-banner');
-    const timeEl = document.getElementById('draft-banner-time');
-    if (timeEl) timeEl.textContent = payload.savedAt ? '（' + _elapsedLabel(payload.savedAt) + '）' : '';
-    if (banner) { banner.style.display = 'flex'; banner._payload = payload; }
-  } catch(e) {}
+  migrateLegacyDraft();
+  const drafts = getDrafts();
+  try { saveDrafts(drafts); } catch (e) {}
+  renderDraftBanner(drafts);
 }
 
 function _elapsedLabel(ts) {
@@ -2034,28 +2111,46 @@ function _elapsedLabel(ts) {
 }
 
 function resumeDraft() {
-  const banner = document.getElementById('draft-banner');
-  const payload = banner && banner._payload;
+  const payload = getDrafts().find(draft => draft.id === selectedDraftId);
   if (!payload) return;
   _restoring = true;
-  Object.assign(data, payload.data);
-  if (!data.staff_name && data.staff_email) data.staff_name = data.staff_email;
+  Object.assign(data, WizardCore.normalizeData(payload.data));
+  activeDraftId = payload.id;
   _restoreUI(payload.step || 1);
   _restoring = false;
-  banner.style.display = 'none';
+  document.getElementById('draft-banner').style.display = 'none';
   saveToLocalStorage(); // 復元後に一度保存して最終保存時刻を更新
 }
 
 function discardDraft() {
-  clearLocalStorage();
-  document.getElementById('draft-banner').style.display = 'none';
+  if (!selectedDraftId) return;
+  try {
+    saveDrafts(getDrafts().filter(draft => draft.id !== selectedDraftId));
+    if (selectedDraftId === activeDraftId) startNewDraft(true);
+    selectedDraftId = null;
+    renderDraftBanner();
+  } catch (e) {}
+}
+
+function startNewDraft(skipConfirm = false) {
+  const hasInput = Object.entries(data).some(([key, value]) => {
+    if (['pump_count', 'sensor_count'].includes(key)) return false;
+    return Array.isArray(value) ? value.length > 0 : typeof value === 'object' ? Object.keys(value || {}).length > 0 : String(value || '').trim() !== '';
+  });
+  if (!skipConfirm && hasInput && !window.confirm('現在の案件は下書きとして保存されます。新しい案件を開始しますか？')) return;
+  activeDraftId = newDraftId();
+  Object.assign(data, WizardCore.createInitialData());
+  _restoring = true;
+  resetFormUI();
+  _restoring = false;
 }
 
 // UI全体を data オブジェクトの値から再構築する
 function _restoreUI(targetStep) {
+  resetFormUI();
   // ── テキスト・数値・日付系 ──
   ['customer_name','desired_delivery','staff_name','delivery_city',
-   'wastewater_type','daily_volume','working_days','raw_tank_size',
+   'wastewater_type','daily_volume','working_days','raw_tank_size','ph_min','ph_max',
    'space_area','power_cable_length','pipe_distance','pipe_step','notes','sensor_other_note',
    'dehydrator_maker','dehydrator_model','raw_water_temp','sludge_amount',
    'step_notes1','step_notes2','step_notes3','step_notes4'
@@ -2074,7 +2169,7 @@ function _restoreUI(targetStep) {
   if (data.industry) {
     const indEl = document.getElementById('industry');
     if (indEl) indEl.value = data.industry;
-    updateWastewaterOptions(data.industry);
+    updateWastewaterOptions(data.industry, true);
     if (data.wastewater_type) {
       const wtSel = document.getElementById('wastewater_type_select');
       if (wtSel) Array.from(wtSel.options).forEach(o => { if (o.value === data.wastewater_type) wtSel.value = o.value; });
@@ -2116,7 +2211,7 @@ function _restoreUI(targetStep) {
   });
 
   // ── 薬品「その他」 ──
-  if (data.chem_other_count) {
+  if (data.chem_other_selected) {
     const el = document.getElementById('chem_other_item');
     if (el && !el.classList.contains('selected')) {
       el.classList.add('selected');
@@ -2128,7 +2223,7 @@ function _restoreUI(targetStep) {
   }
 
   // ── センサー「その他」 ──
-  if (data.sensor_other_count || data.sensor_other_note) {
+  if (data.sensor_other_selected) {
     const el = document.getElementById('sensor-other-item');
     if (el && !el.classList.contains('selected')) {
       el.classList.add('selected');
@@ -2220,12 +2315,18 @@ function selectRadio(key, value, el) {
   data[key] = value;
   el.closest('.radio-grid').querySelectorAll('.radio-item').forEach(e => e.classList.remove('selected'));
   el.classList.add('selected');
+  if (key === 'raw_tank' && value !== 'あり') {
+    data.raw_tank_size = '';
+    const sizeEl = document.getElementById('raw_tank_size');
+    if (sizeEl) sizeEl.value = '';
+  }
+  if (key === 'powder_feeder') calcPumps();
   updateSummary();
 }
 
 const EXCLUSIVE_CHECK_VALUES = {
   metals: 'なし',
-  hazardous: 'なし',
+  hazardous: 'なし/不明',
   other_contam: 'なし/不明',
   carry_in: 'なし'
 };
@@ -2432,6 +2533,7 @@ function toggleSensorOther(el) {
   if (box) box.textContent = isNowSelected ? '✓' : '';
   const wrap = document.getElementById('sensor-other-wrap');
   wrap.style.display = isNowSelected ? 'block' : 'none';
+  data.sensor_other_selected = isNowSelected;
   if (!isNowSelected) {
     document.getElementById('sensor_other_count').value = '';
     document.getElementById('sensor_other_note').value = '';
@@ -2442,18 +2544,13 @@ function toggleSensorOther(el) {
 }
 
 function calcSensors() {
-  const base = (data.level_sensors || []).length;
-  const otherSelected = document.getElementById('sensor-other-item')?.classList.contains('selected');
-  const otherCount = parseInt(data.sensor_other_count) || 0;
-  const total = base + (otherSelected ? otherCount : 0);
-  data.sensor_count = total;
+  const calculated = WizardCore.calculateSensors(data);
+  data.sensor_count = calculated.count;
 
   const el = document.getElementById('sensor-count-result');
-  if (total > 0 || base > 0) {
-    document.getElementById('sensor-count').textContent = total || base;
-    const details = [...(data.level_sensors || [])];
-    if (otherSelected && data.sensor_other_note) details.push('その他（' + data.sensor_other_note + '）');
-    document.getElementById('sensor-detail').textContent = details.join(' / ');
+  if (calculated.count > 0) {
+    document.getElementById('sensor-count').textContent = calculated.count;
+    document.getElementById('sensor-detail').textContent = calculated.details.join(' / ');
     el.style.display = 'block';
   } else {
     el.style.display = 'none';
@@ -2461,16 +2558,15 @@ function calcSensors() {
   updateSummary();
 }
 
-function updatePumpSpec(pump, field, value) {
-  if (!data.pump_specs) data.pump_specs = {};
-  if (!data.pump_specs[pump]) data.pump_specs[pump] = {};
-  data.pump_specs[pump][field] = value;
-  updateSummary();
-}
-
 function onIndustryChange(value) {
+  if (data.industry && data.industry !== value && data.wastewater_type &&
+      !window.confirm('業種を変更すると、入力済みの排水の種類・内容を消去します。続けますか？')) {
+    document.getElementById('industry').value = data.industry;
+    return;
+  }
   updateData('industry', value);
   updateWastewaterOptions(value);
+  updateSummary();
 }
 
 function toggleChemOther(el) {
@@ -2480,9 +2576,13 @@ function toggleChemOther(el) {
   if (box) box.textContent = isNowSelected ? '✓' : '';
   const wrap = document.getElementById('chem_other_wrap');
   wrap.style.display = isNowSelected ? 'block' : 'none';
+  data.chem_other_selected = isNowSelected;
   if (!isNowSelected) {
     document.getElementById('chem_other_count').value = '';
     data.chem_other_count = '';
+    Object.keys(data.chem_details || {}).forEach(key => {
+      if (key === 'その他' || key.indexOf('その他 ') === 0) delete data.chem_details[key];
+    });
   }
   updateSummary();
 }
@@ -2512,8 +2612,7 @@ function updateChemDetail(key, field, value) {
 // 薬剤詳細入力テーブルをチェック状態に合わせて再描画
 function updateChemDetailsTable() {
   const chems = data.chemicals || [];
-  const otherSelected = document.getElementById('chem_other_item')?.classList.contains('selected');
-  const otherCount = parseInt(data.chem_other_count) || (otherSelected ? 1 : 0);
+  const otherKeys = WizardCore.getOtherChemicalKeys(data);
   const area = document.getElementById('chem-details-area');
   const tbody = document.getElementById('chem-details-tbody');
   if (!area || !tbody) return;
@@ -2521,11 +2620,7 @@ function updateChemDetailsTable() {
 
   // 通常薬品 + その他を台数分展開したキーリスト
   const allChems = [...chems];
-  if (otherSelected) {
-    for (let i = 1; i <= otherCount; i++) {
-      allChems.push(otherCount === 1 ? 'その他' : `その他 ${i}`);
-    }
-  }
+  allChems.push(...otherKeys);
 
   if (allChems.length === 0) { area.style.display = 'none'; return; }
   area.style.display = 'block';
@@ -2542,46 +2637,24 @@ function updateChemDetailsTable() {
 
 // 薬注ポンプ台数自動算出
 function calcPumps() {
-  const c = data.chemicals || [];
-  const otherSelected = document.getElementById('chem_other_item')?.classList.contains('selected');
-  const otherCount = parseInt(data.chem_other_count) || 0;
-
-  if (c.length === 0 && !otherSelected) {
-    document.getElementById('pump-calc-result').style.display = 'none';
-    data.pump_count = 0;
-    return;
-  }
-
-  let count = c.length;
-  const details = [...c];
-
-  // 粉体供給機使用時は液体凝集剤ポンプ不要
-  if (data.powder_feeder === '使用する' && c.includes('液体凝集剤')) {
-    count--;
-    details.splice(details.indexOf('液体凝集剤'), 1);
-  }
-
-  // その他台数を加算
-  if (otherSelected && otherCount > 0) {
-    count += otherCount;
-    details.push('その他×' + otherCount + '台');
-  }
-
-  data.pump_count = count;
-  document.getElementById('pump-count').textContent = count;
-  document.getElementById('pump-detail').textContent = details.join(' / ');
-  document.getElementById('pump-calc-result').style.display = 'block';
+  const calculated = WizardCore.calculatePumps(data);
+  data.pump_count = calculated.count;
+  const hasSelection = WizardCore.hasChemicals(data);
+  document.getElementById('pump-calc-result').style.display = hasSelection ? 'block' : 'none';
+  document.getElementById('pump-count').textContent = calculated.count;
+  document.getElementById('pump-detail').textContent = calculated.details.join(' / ');
   updateSummary();
 }
 
-function updateWastewaterOptions(industry) {
+function updateWastewaterOptions(industry, preserveValue = false) {
   const sel = document.getElementById('wastewater_type_select');
   const options = wastewaterOptions[industry] || [];
+  const currentValue = preserveValue ? data.wastewater_type : '';
   sel.innerHTML = '<option value="">── 候補から選択（任意）──</option>' +
     options.map(o => `<option value="${o}">${o}</option>`).join('');
-  // テキスト欄とdataをリセット
-  document.getElementById('wastewater_type').value = '';
-  data.wastewater_type = '';
+  document.getElementById('wastewater_type').value = currentValue;
+  data.wastewater_type = currentValue;
+  if (currentValue && Array.from(sel.options).some(option => option.value === currentValue)) sel.value = currentValue;
 }
 
 function selectWastewaterType(value) {
@@ -2595,19 +2668,14 @@ function selectWastewaterType(value) {
   updateSummary();
 }
 
-function formatPumpSpec(spec) {
-  if (!spec || !spec.count) return '';
-  let s = spec.count + '台';
-  if (spec.lph) s += ' / ' + spec.lph + ' L/h';
-  if (spec.amp) s += ' / ' + spec.amp + ' A';
-  return s;
-}
-
 // ===== SVG Flow Diagram Generator =====
 // 変更箇所: 旧HTMLベースのフロー図をSVGテンプレート方式に置換
 function buildFlowSVG(d) {
   const chemicals = Array.isArray(d.chemicals) ? d.chemicals.filter(Boolean) : [];
-  const topInputs = [...chemicals];
+  const displayedChemicals = d.powder_feeder === '使用する'
+    ? chemicals.filter(chemical => chemical !== '液体凝集剤')
+    : chemicals;
+  const topInputs = [...displayedChemicals];
   // その他薬品を台数分展開してフロー図に追加
   const otherCount = parseInt(d.chem_other_count) || 0;
   if (otherCount > 0) {
@@ -2644,9 +2712,11 @@ function buildFlowSVG(d) {
   const marginR = 28;
   const headerH = 84;
 
-  const hasRelay   = (d.option_tanks || []).includes('中継槽');
+  const hasRelay = (d.option_tanks || []).includes('中継槽');
   const hasMonitor = (d.option_tanks || []).includes('監視槽');
-  const noFilter   = d.filter_branches === 'ろ過しない';
+  const hasSludgeTank = (d.option_tanks || []).includes('汚泥貯槽');
+  const noFilter = d.filter_branches === 'ろ過しない';
+  const filterConfigured = Boolean(d.filter_branches) && d.filter_branches !== '不明' && !noFilter;
 
   // 原水ポンプ削除。中継槽あり：原水槽→中継槽→凝集沈殿槽
   const rawX    = marginL;
@@ -2777,11 +2847,13 @@ function buildFlowSVG(d) {
   if (hasMonitor) drawNode(monitorX, mainY, '監視槽',   '', 'tank');
   drawNode(dischargeX, mainY, '放流', d.discharge_dest || '放流先', 'end');
 
-  // ろ過しない → 汚泥貯槽のみ。ろ過あり → ろ過装置＋放流
+  // 未確認時にろ過装置を勝手に描かず、選択済みの汚泥貯槽はフローにも反映する。
   if (noFilter) {
-    drawNode(filterX, filterY, '汚泥貯槽', '', 'tank');
+    drawNode(filterX, filterY, hasSludgeTank ? '汚泥貯槽' : '汚泥処理', hasSludgeTank ? '' : '要確認', 'tank');
+  } else if (!filterConfigured) {
+    drawNode(filterX, filterY, 'ろ過条件', '要確認', 'tank');
   } else {
-    drawNode(filterX,  filterY, 'ろ過装置', 'スラッジろ過', 'coag');
+    drawNode(filterX, filterY, hasSludgeTank ? '汚泥貯槽・ろ過装置' : 'ろ過装置', hasSludgeTank ? 'スラッジ貯留・ろ過' : 'スラッジろ過', hasSludgeTank ? 'tank' : 'coag');
     drawNode(lowerX,   filterY, '放流', '', 'end');
   }
 
@@ -2819,53 +2891,42 @@ function buildFlowSVG(d) {
     p.push(`<text x="${sludgeDnX + 6}" y="${(mainY + nodeH + filterY) / 2}" font-family="${FF}" font-size="10" fill="${C.sub}">${noFilter ? '汚泥' : 'スラッジ'}</text>`);
   }
 
-  // ろ過装置 → 放流（下）：ろ過しない場合は描画しない
-  if (!noFilter) {
+  // ろ過装置 → 放流（下）：未確認・ろ過なしの場合は描画しない
+  if (filterConfigured) {
     p.push(`<line x1="${filterX + nodeW}" y1="${filterCy}" x2="${lowerX - 12}" y2="${filterCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" style="display:block;min-width:${svgW}px;border-radius:6px;">${p.join('')}<\/svg>`;
 }
 
-const REQUIRED_RESULT_FIELDS = [
-  ['customer_name', '顧客名'],
-  ['delivery_location', '納品場所'],
-  ['wastewater_type', '排水の種類・内容'],
-  ['daily_volume', '1日の排水量'],
-  ['tank_capacity', '排水処理装置の容量'],
-  ['filter_branches', 'ろ過分岐数'],
-  ['powder_feeder', '粉体供給機の使用'],
-  ['chemicals', '使用薬品']
-];
-
-function renderMissingCheck() {
-  const missing = REQUIRED_RESULT_FIELDS.filter(([key]) => {
-    if (key === 'delivery_location') {
-      return ![data.delivery_pref, data.delivery_city].filter(Boolean).join(' ').trim();
-    }
-    const value = data[key];
-    if (Array.isArray(value)) return value.length === 0;
-    return !String(value || '').trim();
-  }).map(([, label]) => label);
-
+function renderMissingCheck(validation = WizardCore.validateData(data)) {
   const el = document.getElementById('result-missing-check');
   if (!el) return;
-
-  if (missing.length === 0) {
+  if (validation.errors.length === 0 && validation.warnings.length === 0) {
     el.innerHTML = '<div class="missing-check-ok">✓ 概算見積もりに必要な項目は入力済みです。</div>';
     return;
   }
-
   el.innerHTML = `
-    <div class="missing-check-warn">⚠ 概算見積もりに必要な項目で、未入力のものがあります。</div>
+    ${validation.errors.length ? `<div class="missing-check-warn">⚠ 入力内容に修正が必要な項目があります。</div><div class="missing-check-list">${validation.errors.map(message => `<div class="missing-check-item">${escapeHtml(message)}</div>`).join('')}</div>` : ''}
+    ${validation.warnings.length ? `<div class="missing-check-warn">⚠ 確認が必要な項目があります。</div>` : ''}
     <div class="missing-check-list">
-      ${missing.map(label => `<div class="missing-check-item">${label}</div>`).join('')}
+      ${validation.warnings.map(label => `<div class="missing-check-item">${escapeHtml(label)}</div>`).join('')}
     </div>
   `;
 }
 
 // ===== Generate Result =====
 function generateResult() {
+  calcPumps();
+  calcSensors();
+  const validation = WizardCore.validateData(data);
+  if (validation.errors.length) {
+    window.alert(`PDFを作成できません。\n\n${validation.errors.join('\n')}`);
+    return;
+  }
+  if (validation.warnings.length && !window.confirm(`未確認または未入力の項目があります。\n\n${validation.warnings.join('\n')}\n\n内容を確認したうえで、ヒアリングシートを作成しますか？`)) {
+    return;
+  }
   const hazardous = data.hazardous || [];
   const hasCyanide = hazardous.includes('シアン(CN)');
   const hasChromium6 = hazardous.includes('六価クロム(Cr6+)');
@@ -2889,13 +2950,11 @@ function generateResult() {
 
   // ---- フロー図（SVG生成 — buildFlowSVG に委譲）----
   document.getElementById('result-flow').innerHTML = buildFlowSVG(data);
-  renderMissingCheck();
+  renderMissingCheck(validation);
 
   // ---- データテーブル ----
-  const sensorSummary = [
-    ...(data.level_sensors || []),
-    ...(data.sensor_other_note ? ['その他（' + data.sensor_other_note + '）'] : [])
-  ].join('、');
+  const sensorSummary = WizardCore.calculateSensors(data).details.join('、');
+  const chemicalSummary = [...(data.chemicals || []), ...WizardCore.getOtherChemicalKeys(data)].join('、');
 
   const rows = [
     ['顧客名', data.customer_name],
@@ -2911,7 +2970,7 @@ function generateResult() {
     ['装置容量', data.tank_capacity],
     ['ろ過分岐数', data.filter_branches],
     ['粉体供給機', data.powder_feeder],
-    ['使用薬品', (data.chemicals||[]).join('、')],
+    ['使用薬品', chemicalSummary],
     ['薬注ポンプ台数', data.pump_count > 0 ? data.pump_count + ' 台' : ''],
     ['pH範囲', (data.ph_min || data.ph_max) ? (data.ph_min||'?') + ' 〜 ' + (data.ph_max||'?') : ''],
     ['原水水温', data.raw_water_temp ? data.raw_water_temp + ' ℃' : ''],
@@ -2925,8 +2984,10 @@ function generateResult() {
     ['pH計 設置槽', (data.option_ph_tanks||[]).length > 0 ? '凝集沈殿槽（標準）' + ((data.option_ph_tanks||[]).length > 0 ? '、' + (data.option_ph_tanks||[]).join('、') : '') : '凝集沈殿槽（標準）'],
     ['濁度計 設置槽', (data.option_turbidity_tanks||[]).join('、')],
     ['脱水機', data.option_dehydrator + (data.option_dehydrator === '必要' && (data.dehydrator_maker || data.dehydrator_model) ? '（' + [data.dehydrator_maker, data.dehydrator_model].filter(Boolean).join(' ') + '）' : '')],
-    ['原水槽', data.raw_tank ? data.raw_tank + (data.raw_tank_size ? '（' + data.raw_tank_size + ' m³）' : '') : ''],
+    ['原水槽', data.raw_tank ? data.raw_tank + (data.raw_tank === 'あり' && data.raw_tank_size ? '（' + data.raw_tank_size + ' m³）' : '') : ''],
     ['電源容量', data.power_status],
+    ['電源コード長さ', data.power_cable_length ? data.power_cable_length + ' m' : ''],
+    ['一次側電源の接続形状', data.primary_power_connection],
     ...((data.extra_pumps||[]).filter(Boolean).map((p,i) =>
       [`追加ポンプ${i+1}`, [p.name, p.count ? p.count+'台' : '', p.lph ? p.lph+'kW' : '', p.amp ? p.amp+'A' : ''].filter(Boolean).join(' / ')]
     )),
@@ -2952,13 +3013,7 @@ function generateResult() {
   const chemSection = document.getElementById('result-chemical-section');
   const chemTbody = document.getElementById('result-chemical-tbody');
   const allChems = [...(data.chemicals || [])];
-  const otherSel = document.getElementById('chem_other_item')?.classList.contains('selected');
-  const otherCount = parseInt(data.chem_other_count) || (otherSel ? 1 : 0);
-  if (otherSel) {
-    for (let i = 1; i <= otherCount; i++) {
-      allChems.push(otherCount === 1 ? 'その他' : `その他 ${i}`);
-    }
-  }
+  allChems.push(...WizardCore.getOtherChemicalKeys(data));
   if (chemSection && chemTbody) {
     if (allChems.length > 0) {
       chemTbody.innerHTML = allChems.map(c => {
@@ -2966,8 +3021,10 @@ function generateResult() {
         return `<tr><td>${escapeHtml(c)}</td><td>${escapeHtml(d.name || '—')}</td><td>${escapeHtml(d.amount || '—')}</td></tr>`;
       }).join('');
       chemSection.style.display = 'block';
+      chemSection.classList.remove('is-empty');
     } else {
       chemSection.style.display = 'none';
+      chemSection.classList.add('is-empty');
     }
   }
 
@@ -3015,32 +3072,20 @@ function closeResetModal() {
 }
 
 function executeReset() {
-  // dataオブジェクトをリセット
-  Object.assign(data, {
-    customer_name: '', desired_delivery: '', staff_name: '',
-    install_type: '', delivery_pref: '', delivery_city: '',
-    industry: '', wastewater_type: '', daily_volume: '', working_days: '', batch_count: '',
-    tank_capacity: '', filter_branches: '', powder_feeder: '',
-    chemicals: [], pump_count: 0, chem_other_count: '', chem_details: {},
-    ph_min: '', ph_max: '', raw_water_temp: '', sludge_amount: '',
-    metals: [], hazardous: [], other_contam: [],
-    discharge_dest: '', regulation_status: '',
-    option_tanks: [], option_ph_tanks: [], option_turbidity_tanks: [],
-    option_dehydrator: '', dehydrator_maker: '', dehydrator_model: '',
-    raw_tank: '', raw_tank_size: '', existing_equip: [], existing_equip_other: '',
-    existing_power_kw: '', power_status: '',
-    extra_pumps: [],
-    level_sensors: [], sensor_count: 0, sensor_other_count: '', sensor_other_note: '',
-    space_area: '', location_type: '', power_cable_length: '', primary_power_connection: '', carry_in: [], access: [],
-    pipe_distance: '', pipe_step: '', slope_status: '', notes: '', step_notes1: '', step_notes2: '', step_notes3: '', step_notes4: ''
-  });
+  clearLocalStorage();
+  activeDraftId = null;
+  Object.assign(data, WizardCore.createInitialData());
+  _restoring = true;
+  resetFormUI();
+  _restoring = false;
+  renderDraftBanner();
+  closeResetModal();
+}
 
-  // テキスト・数値・日付・セレクト・テキストエリアをクリア
+function resetFormUI() {
   document.querySelectorAll('#main-container input, #main-container select, #main-container textarea').forEach(el => {
     el.value = '';
   });
-
-  // ラジオ・チェックボックスの選択状態をリセット
   document.querySelectorAll('.radio-item.selected').forEach(el => el.classList.remove('selected'));
   document.querySelectorAll('.check-item.selected').forEach(el => {
     el.classList.remove('selected');
@@ -3048,27 +3093,24 @@ function executeReset() {
     if (box) box.textContent = '';
   });
 
-  // 追加ポンプ行をリセット
   document.getElementById('extra-pump-rows').innerHTML =
     '<tr id="extra-pump-empty" style="color:var(--text3); font-size:12px;">' +
     '<td colspan="5" style="padding:12px 4px; text-align:center;">「＋ポンプを追加」から入力してください</td></tr>';
   pumpRowCount = 0;
 
-  // 動的に表示される要素を非表示に
   document.getElementById('chem_other_wrap').style.display = 'none';
+  document.getElementById('chem-details-area').style.display = 'none';
+  document.getElementById('chem-details-tbody').replaceChildren();
   document.getElementById('pump-calc-result').style.display = 'none';
   document.getElementById('sensor-other-wrap').style.display = 'none';
   document.getElementById('sensor-count-result').style.display = 'none';
 
-  // 排水候補セレクトをリセット
   document.getElementById('wastewater_type_select').innerHTML =
     '<option value="">業種を選択すると候補が表示されます</option>';
 
-  // 結果ページが表示中なら元に戻す
   document.getElementById('main-container').style.display = 'grid';
   document.getElementById('result-page').classList.remove('show');
 
-  // ステップをリセットして STEP 1 へ
   document.querySelectorAll('.step-panel').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.step-nav-item').forEach(el => el.classList.remove('done', 'active'));
   currentStep = 1;
@@ -3079,8 +3121,6 @@ function executeReset() {
 
   updateFlowPreview();
   updateSummary();
-  clearLocalStorage();
-  closeResetModal();
 }
 
 // ESCキーでモーダルを閉じる
