@@ -91,3 +91,118 @@ test('other sensor count is retained in the result summary', () => {
     details: ['原水槽', '薬液タンク（2台）']
   });
 });
+
+const capacityData = (overrides = {}) => core.normalizeData({
+  daily_volume: '3', tank_capacity: '500L', working_volume_percent: '80',
+  operating_hours: '8', batch_cycle_minutes: '60', ...overrides
+});
+
+test('capacity check accounts for usable volume and rounds partial batches up', () => {
+  const result = core.calculateBatchCapacity(capacityData());
+  assert.equal(result.effectiveBatchM3, 0.4);
+  assert.equal(result.requiredBatches, 8);
+  assert.equal(result.possibleBatches, 8);
+  assert.equal(result.requiredMinutes, 480);
+  assert.equal(result.dailyCapacityM3, 3.2);
+  assert.equal(result.shortfallM3, 0);
+  assert.equal(result.status, 'at_limit');
+  assert.ok(core.validateData(capacityData()).warnings.some(message => message.includes('時間の余裕')));
+});
+
+test('capacity shortage is advisory and includes untreated daily volume', () => {
+  const data = capacityData({ daily_volume: '5', batch_cycle_minutes: '90' });
+  const result = core.calculateBatchCapacity(data);
+  assert.equal(result.status, 'insufficient');
+  assert.equal(result.requiredBatches, 13);
+  assert.equal(result.possibleBatches, 5);
+  assert.equal(result.requiredMinutes, 1170);
+  assert.equal(result.dailyCapacityM3, 2);
+  assert.equal(result.shortfallM3, 3);
+  assert.equal(result.timeMarginMinutes, -690);
+  assert.equal(core.validateData(data).errors.length, 0);
+  assert.ok(core.validateData(data).warnings.some(message => message.includes('バッチ処理能力が不足')));
+});
+
+test('larger capacity immediately changes the calculated time margin', () => {
+  const result = core.calculateBatchCapacity(capacityData({ tank_capacity: '1000L' }));
+  assert.equal(result.status, 'sufficient');
+  assert.equal(result.requiredBatches, 4);
+  assert.equal(result.requiredMinutes, 240);
+  assert.equal(result.timeMarginMinutes, 240);
+});
+
+test('all standard tank sizes are converted from litres to cubic metres', () => {
+  for (const [tank_capacity, expected] of [['200L', 0.2], ['500L', 0.5], ['1000L', 1]]) {
+    assert.equal(core.calculateBatchCapacity(capacityData({ tank_capacity, working_volume_percent: '100' })).effectiveBatchM3, expected);
+  }
+});
+
+test('a cycle longer than the operating window completes no batches', () => {
+  const result = core.calculateBatchCapacity(capacityData({ batch_cycle_minutes: '1500' }));
+  assert.equal(result.status, 'insufficient');
+  assert.equal(result.possibleBatches, 0);
+  assert.equal(result.dailyCapacityM3, 0);
+  assert.equal(result.shortfallM3, 3);
+});
+
+test('floating-point boundaries do not invent or lose whole batches', () => {
+  const exact = core.calculateBatchCapacity(capacityData({ daily_volume: '0.07', tank_capacity: '200L', working_volume_percent: '5', operating_hours: '0.29', batch_cycle_minutes: '0.1' }));
+  assert.equal(exact.requiredBatches, 7);
+  assert.equal(exact.possibleBatches, 174);
+  const exactTime = core.calculateBatchCapacity(capacityData({ daily_volume: '1.74', tank_capacity: '200L', working_volume_percent: '5', operating_hours: '0.29', batch_cycle_minutes: '0.1' }));
+  assert.equal(exactTime.requiredBatches, 174);
+  assert.equal(exactTime.status, 'at_limit');
+  assert.equal(exactTime.timeMarginMinutes, 0);
+  const above = core.calculateBatchCapacity(capacityData({ daily_volume: '3.20000001' }));
+  assert.equal(above.requiredBatches, 9);
+  assert.equal(above.status, 'insufficient');
+  const below = core.calculateBatchCapacity(capacityData({ operating_hours: '7.99999999' }));
+  assert.equal(below.possibleBatches, 7);
+  assert.equal(below.status, 'insufficient');
+});
+
+test('old drafts stay valid with unknown conditions and no assumed defaults', () => {
+  const old = core.normalizeData({ daily_volume: '5', tank_capacity: '500L' });
+  const result = core.calculateBatchCapacity(old);
+  assert.equal(result.status, 'incomplete');
+  assert.deepEqual(plain(result.missing), ['運転可能時間', '1バッチの所要時間', '容量の有効使用率']);
+  assert.equal(Object.hasOwn(result, 'dailyCapacityM3'), false);
+  assert.deepEqual(plain(core.validateData(old).errors), []);
+  for (const key of ['daily_volume', 'tank_capacity', 'operating_hours', 'batch_cycle_minutes', 'working_volume_percent']) {
+    assert.equal(core.calculateBatchCapacity(capacityData({ [key]: ' ' })).status, 'incomplete', key);
+  }
+});
+
+test('invalid capacity inputs are rejected even when other conditions are missing', () => {
+  for (const key of ['daily_volume', 'operating_hours', 'batch_cycle_minutes', 'working_volume_percent']) {
+    for (const value of ['0', '-1', 'NaN', 'Infinity', '1e309', 'abc']) {
+      const data = capacityData({ [key]: value });
+      assert.equal(core.calculateBatchCapacity(data).status, 'invalid', `${key}=${value}`);
+      assert.ok(core.validateData(data).errors.length > 0);
+    }
+  }
+  for (const invalid of [{ operating_hours: '24.01' }, { working_volume_percent: '100.01' }, { tank_capacity: '750L' }, { tank_capacity: 'toString' }]) {
+    assert.equal(core.calculateBatchCapacity(capacityData(invalid)).status, 'invalid');
+  }
+  assert.equal(core.calculateBatchCapacity(capacityData({ operating_hours: '24', working_volume_percent: '100' })).status, 'sufficient');
+  assert.ok(core.validateData(core.normalizeData({ operating_hours: '-1' })).errors.length > 0);
+});
+
+test('unrepresentable calculations fail closed instead of showing Infinity or unsafe counts', () => {
+  for (const extreme of [{ daily_volume: '1e308' }, { batch_cycle_minutes: '1e-300' }, { working_volume_percent: '5e-324' }, { batch_cycle_minutes: '1e308' }]) {
+    const result = core.calculateBatchCapacity(capacityData(extreme));
+    assert.equal(result.status, 'invalid');
+    assert.ok(result.errors.some(message => message.includes('計算範囲')));
+  }
+});
+
+test('capacity conditions survive draft serialization and calculations do not mutate data', () => {
+  const data = capacityData();
+  const before = JSON.stringify(data);
+  for (const batch_count of ['1回', '2〜3回', '4回以上', '不定期']) {
+    assert.equal(core.calculateBatchCapacity({ ...data, batch_count }).requiredBatches, 8);
+  }
+  core.calculateBatchCapacity(data);
+  assert.equal(JSON.stringify(data), before);
+  assert.deepEqual(plain(core.normalizeData(JSON.parse(before))), plain(data));
+});

@@ -11,6 +11,7 @@
     install_type: '', delivery_pref: '', delivery_city: '',
     industry: '', wastewater_type: '', daily_volume: '', working_days: '', batch_count: '',
     tank_capacity: '', filter_branches: '', powder_feeder: '',
+    operating_hours: '', batch_cycle_minutes: '', working_volume_percent: '',
     chemicals: [], chem_other_selected: false, pump_count: 0, chem_other_count: '', chem_details: {},
     ph_min: '', ph_max: '', raw_water_temp: '', sludge_amount: '',
     metals: [], hazardous: [], other_contam: [],
@@ -121,10 +122,66 @@
     return Number.isFinite(number) && number >= min && number <= max;
   }
 
+  // One unit, sequential batches, completed within the daily operating window.
+  // No assumed cycle time or usable volume: unknown conditions stay unknown.
+  function calculateBatchCapacity(data) {
+    const missing = [];
+    const errors = [];
+    const fields = [
+      ['daily_volume', '1日の排水量', Infinity],
+      ['operating_hours', '運転可能時間', 24],
+      ['batch_cycle_minutes', '1バッチの所要時間', Infinity],
+      ['working_volume_percent', '容量の有効使用率', 100]
+    ];
+    fields.forEach(([key, label, max]) => {
+      if (!isPresent(data[key])) {
+        missing.push(label);
+      } else if (!Number.isFinite(Number(data[key])) || Number(data[key]) <= 0 || Number(data[key]) > max) {
+        errors.push(`${label}は0より大きい${Number.isFinite(max) ? `${max}以下の` : ''}数値で入力してください。`);
+      }
+    });
+    const capacities = { '200L': 200, '500L': 500, '1000L': 1000 };
+    if (!isPresent(data.tank_capacity)) missing.push('排水処理装置の容量');
+    else if (!Object.prototype.hasOwnProperty.call(capacities, data.tank_capacity)) errors.push('装置容量は200L・500L・1000Lから選択してください。');
+    if (errors.length || missing.length) {
+      return { status: errors.length ? 'invalid' : 'incomplete', missing, errors };
+    }
+
+    // Correct only floating-point noise at integer boundaries, before ceil/floor.
+    const snapInteger = (value) => {
+      const nearest = Math.round(value);
+      return Math.abs(value - nearest) <= 8 * Number.EPSILON * Math.max(1, Math.abs(value)) ? nearest : value;
+    };
+    const effectiveBatchM3 = capacities[data.tank_capacity] / 1000 * Number(data.working_volume_percent) / 100;
+    const availableMinutes = Number(data.operating_hours) * 60;
+    const cycleMinutes = Number(data.batch_cycle_minutes);
+    const requiredBatches = Math.max(1, Math.ceil(snapInteger(Number(data.daily_volume) / effectiveBatchM3)));
+    const possibleBatches = Math.floor(snapInteger(availableMinutes / cycleMinutes));
+    const requiredMinutes = requiredBatches * cycleMinutes;
+    const dailyCapacityM3 = possibleBatches * effectiveBatchM3;
+    if (effectiveBatchM3 <= 0 || !Number.isSafeInteger(requiredBatches) || !Number.isSafeInteger(possibleBatches) ||
+        !Number.isFinite(requiredMinutes) || !Number.isFinite(dailyCapacityM3)) {
+      return { status: 'invalid', missing: [], errors: ['処理能力の計算範囲を超えています。排水量・有効使用率・所要時間を確認してください。'] };
+    }
+    const rawTimeMargin = availableMinutes - requiredMinutes;
+    const timeMarginMinutes = Math.abs(rawTimeMargin) <= 8 * Number.EPSILON * Math.max(1, availableMinutes, requiredMinutes)
+      ? 0 : rawTimeMargin;
+    return {
+      status: requiredBatches > possibleBatches ? 'insufficient' : timeMarginMinutes === 0 ? 'at_limit' : 'sufficient',
+      missing, errors, effectiveBatchM3, requiredBatches, possibleBatches,
+      requiredMinutes, availableMinutes, dailyCapacityM3, timeMarginMinutes,
+      shortfallM3: requiredBatches > possibleBatches ? Math.max(0, Number(data.daily_volume) - dailyCapacityM3) : 0
+    };
+  }
+
   function validateData(data) {
     const errors = [];
     const warnings = [];
     const addWarning = (condition, message) => { if (condition) warnings.push(message); };
+    const capacity = calculateBatchCapacity(data);
+    errors.push(...capacity.errors);
+    addWarning(capacity.status === 'insufficient', 'バッチ処理能力が不足しています。装置容量・運転時間・処理条件を見直してください。');
+    addWarning(capacity.status === 'at_limit', 'バッチ処理の必要時間が運転可能時間と同じです。時間の余裕を確認してください。');
 
     if (!isNumberInRange(data.ph_min, 0, 14) || !isNumberInRange(data.ph_max, 0, 14)) {
       errors.push('pHは0から14の範囲で入力してください。');
@@ -132,15 +189,12 @@
     if (isPresent(data.ph_min) && isPresent(data.ph_max) && Number(data.ph_min) > Number(data.ph_max)) {
       errors.push('pHの最小値は最大値以下にしてください。');
     }
-    [['daily_volume', '1日の排水量'], ['raw_tank_size', '原水槽のサイズ'], ['space_area', '設置スペース'],
+    [['raw_tank_size', '原水槽のサイズ'], ['space_area', '設置スペース'],
       ['power_cable_length', '電源コード長さ'], ['pipe_distance', '横引き距離']].forEach(([key, label]) => {
       if (isPresent(data[key]) && (!Number.isFinite(Number(data[key])) || Number(data[key]) < 0)) {
         errors.push(`${label}は0以上の数値で入力してください。`);
       }
     });
-    if (isPresent(data.daily_volume) && Number(data.daily_volume) <= 0) {
-      errors.push('1日の排水量は0より大きい数値で入力してください。');
-    }
     if (isPresent(data.working_days) && (!Number.isFinite(Number(data.working_days)) || Number(data.working_days) < 1 || Number(data.working_days) > 31)) {
       errors.push('稼働日数は1から31の範囲で入力してください。');
     }
@@ -192,6 +246,7 @@
     hasChemicals,
     calculatePumps,
     calculateSensors,
+    calculateBatchCapacity,
     validateData
   };
 })(typeof window !== 'undefined' ? window : globalThis);

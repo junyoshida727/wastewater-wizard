@@ -208,6 +208,28 @@
     white-space: nowrap;
   }
 
+  .capacity-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 28px;
+  }
+  .capacity-section h3 { font-size: 15px; margin-bottom: 10px; }
+  .capacity-help { font-size: 12px; color: var(--text2); line-height: 1.8; margin: 8px 0; overflow-wrap: anywhere; }
+  .capacity-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 18px 0; }
+  .capacity-inputs input { min-width: 0; }
+  .capacity-report { border-top: 1px solid var(--border); padding-top: 12px; }
+  .capacity-status { font-size: 14px; font-weight: 700; line-height: 1.6; }
+  .capacity-report[data-status="sufficient"] .capacity-status { color: var(--accent); }
+  .capacity-report[data-status="insufficient"] .capacity-status,
+  .capacity-report[data-status="at_limit"] .capacity-status,
+  .capacity-report[data-status="invalid"] .capacity-status { color: var(--warn); }
+  .capacity-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin: 12px 0; }
+  .capacity-metrics > div { padding: 8px 0; border-bottom: 1px solid var(--border); min-width: 0; }
+  .capacity-metrics dt { font-size: 12px; color: var(--text2); }
+  .capacity-metrics dd { font-size: 16px; margin-top: 4px; overflow-wrap: anywhere; }
+
   /* Checkbox / Radio Grid */
   .check-grid {
     display: grid;
@@ -893,6 +915,9 @@
   /* スマホ（〜600px）: モバイル最適化レイアウト */
   @media (max-width: 600px) {
 
+    .capacity-inputs, .capacity-metrics { grid-template-columns: 1fr; }
+    .capacity-section { padding: 16px; }
+
     /* === ヘッダー === */
     header { padding: 10px 16px; gap: 8px; flex-wrap: wrap; min-height: 52px; }
     header h1 { font-size: 13px; }
@@ -1089,6 +1114,19 @@
       color: #111 !important;
       background: #fff !important;
     }
+
+    .capacity-section {
+      background: #f7f7f7 !important;
+      border: 1px solid #ccc !important;
+      padding: 8px !important;
+      margin-bottom: 8px !important;
+      break-inside: avoid;
+    }
+    .capacity-section * { color: #111 !important; }
+    .capacity-section h3, .capacity-status { font-size: 10pt !important; }
+    .capacity-help, .capacity-metrics dt, .capacity-metrics dd { font-size: 8pt !important; }
+    .capacity-metrics { grid-template-columns: 1fr 1fr !important; gap: 0 12px; margin: 6px 0; }
+    .capacity-metrics > div { padding: 4px 0; }
 
     /* ヘッダー */
     .pdf-header {
@@ -1382,7 +1420,7 @@
           </div>
         </div>
         <div class="input-with-unit">
-          <input type="number" id="daily_volume" placeholder="例: 5" min="0" oninput="updateData('daily_volume', this.value)">
+          <input type="number" id="daily_volume" placeholder="例: 5" min="0" step="any" oninput="updateData('daily_volume', this.value)">
           <span class="unit">m³/日</span>
         </div>
       </div>
@@ -1413,6 +1451,36 @@
           <div class="radio-item" onclick="selectRadio('tank_capacity', '1000L', this)">1000L</div>
         </div>
       </div>
+
+      <section class="capacity-section" aria-labelledby="capacity-heading">
+        <h3 id="capacity-heading">バッチ処理能力の概算チェック</h3>
+        <p class="capacity-help">上の排水量・装置容量と、以下の運転条件から日処理能力を確認します。任意入力です。条件が不明な場合は空欄にしてください。</p>
+        <div class="capacity-inputs">
+          <div>
+            <label class="field-label" for="operating_hours">運転可能時間</label>
+            <div class="input-with-unit">
+              <input type="number" id="operating_hours" min="0" max="24" step="any" placeholder="例: 8" aria-describedby="capacity-conditions-help" oninput="updateData('operating_hours', this.value)">
+              <span class="unit">時間/日</span>
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="batch_cycle_minutes">1バッチの所要時間</label>
+            <div class="input-with-unit">
+              <input type="number" id="batch_cycle_minutes" min="0" step="any" placeholder="例: 90" aria-describedby="capacity-conditions-help" oninput="updateData('batch_cycle_minutes', this.value)">
+              <span class="unit">分/回</span>
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="working_volume_percent">容量の有効使用率</label>
+            <div class="input-with-unit">
+              <input type="number" id="working_volume_percent" min="0" max="100" step="any" placeholder="例: 80" aria-describedby="capacity-conditions-help" oninput="updateData('working_volume_percent', this.value)">
+              <span class="unit">%</span>
+            </div>
+          </div>
+        </div>
+        <p class="capacity-help" id="capacity-conditions-help">運転可能時間は休止・保守時間を除いた時間、所要時間は給水・反応・沈殿・排水・汚泥排出など次のバッチ開始までの全工程を入力。有効使用率は、装置容量のうち1回に受け入れられる原水量の割合です。メーカー仕様・試験結果等をもとに設定してください。入力例は推奨値ではありません。</p>
+        <div id="capacity-preview" role="status" aria-live="polite" aria-atomic="true"></div>
+      </section>
 
       <div class="field-group">
         <div class="field-label">ろ過分岐数</div>
@@ -1926,6 +1994,11 @@
       <div id="result-missing-check"></div>
     </div>
 
+    <section class="capacity-section" aria-labelledby="result-capacity-heading">
+      <h3 id="result-capacity-heading">バッチ処理能力の概算チェック</h3>
+      <div id="result-capacity"></div>
+    </section>
+
     <!-- 入力データ一覧 -->
     <div class="data-table-section">
       <div class="flow-result-title">ヒアリング内容一覧</div>
@@ -2151,6 +2224,7 @@ function _restoreUI(targetStep) {
    'wastewater_type','daily_volume','working_days','raw_tank_size','ph_min','ph_max',
    'space_area','power_cable_length','pipe_distance','pipe_step','notes','sensor_other_note',
    'dehydrator_maker','dehydrator_model','raw_water_temp','sludge_amount',
+   'operating_hours','batch_cycle_minutes','working_volume_percent',
    'step_notes1','step_notes2','step_notes3','step_notes4'
   ].forEach(key => {
     const el = document.getElementById(key);
@@ -2430,6 +2504,7 @@ function setArrow(id, show) {
 
 // ===== Summary =====
 function updateSummary() {
+  renderBatchCapacity();
   const rows = [
     ['業種', data.industry ? getIndustryLabel(data.industry) : ''],
     ['排水量', data.daily_volume ? data.daily_volume + ' m³/日' : ''],
@@ -2447,6 +2522,56 @@ function updateSummary() {
     </div>`).join('');
   document.getElementById('data-summary').innerHTML = html;
   saveToLocalStorage();
+}
+
+// The same renderer is used by the live form and the printable result.
+function buildBatchCapacityHTML(d) {
+  const result = WizardCore.calculateBatchCapacity(d);
+  const labels = {
+    incomplete: '未判定：計算条件が不足しています',
+    invalid: '未判定：入力条件を修正してください',
+    insufficient: '処理能力不足：運転時間内に処理しきれません',
+    at_limit: '時間の余裕なし：運転可能時間と必要時間が同じです',
+    sufficient: '入力条件上は運転時間内に処理できます'
+  };
+  const format = (value) => value > 0 && value < 0.001 ? '0.001未満' : value.toLocaleString('ja-JP', { maximumFractionDigits: 3 });
+  const condition = (value, unit) => String(value ?? '').trim() ? `${value} ${unit}` : '未入力';
+  const basis = [
+    `排水量 ${condition(d.daily_volume, 'm³/日')}`,
+    `装置容量 ${condition(d.tank_capacity, '')}`,
+    `有効使用率 ${condition(d.working_volume_percent, '%')}`,
+    `運転可能時間 ${condition(d.operating_hours, '時間/日')}`,
+    `所要時間 ${condition(d.batch_cycle_minutes, '分/回')}`
+  ].join(' ／ ');
+  let details = '';
+  if (result.errors.length) details += `<p class="capacity-help">${result.errors.map(escapeHtml).join('<br>')}</p>`;
+  if (result.missing.length) details += `<p class="capacity-help">未入力：${result.missing.map(escapeHtml).join('、')}</p>`;
+  if (!result.errors.length && !result.missing.length) {
+    const rows = [
+      ['1バッチの有効処理量', `${format(result.effectiveBatchM3)} m³/回`],
+      ['必要バッチ数（端数切り上げ）', `${format(result.requiredBatches)} 回/日`],
+      ['実行可能バッチ数（端数切り捨て）', `${format(result.possibleBatches)} 回/日`],
+      ['必要運転時間', `${format(result.requiredMinutes / 60)} 時間/日`],
+      ['日処理可能量', `${format(result.dailyCapacityM3)} m³/日`],
+      [result.timeMarginMinutes < 0 ? '不足する運転時間' : '運転時間の余裕', `${format(Math.abs(result.timeMarginMinutes) / 60)} 時間/日`],
+      ['1日の未処理量', `${format(result.shortfallM3)} m³/日`]
+    ];
+    details += `<dl class="capacity-metrics">${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>`;
+    if (result.status === 'insufficient' || result.status === 'at_limit') {
+      details += '<p class="capacity-help">装置容量・運転可能時間を見直し、所要時間と有効使用率を実機条件で確認してください。</p>';
+    }
+  }
+  return `<div class="capacity-report" data-status="${result.status}">
+    <p class="capacity-status">${labels[result.status]}</p>
+    ${details}
+    <p class="capacity-help">計算条件：${escapeHtml(basis)}</p>
+    <p class="capacity-help">装置1台で順次処理し、端数のバッチにも所要時間の全量を見込みます。「1日のバッチ回数」の選択値は幅があるため計算に使いません。排水量のピーク変動・原水槽の貯留能力・処理水質は別途確認が必要です。</p>
+    <p class="capacity-help">計算式：有効処理量 = 装置容量(L) ÷ 1000 × 有効使用率 ÷ 100。必要回数 = 排水量 ÷ 有効処理量（切り上げ）。実行可能回数 = 運転可能時間 × 60 ÷ 所要時間（切り捨て）。日処理可能量 = 実行可能回数 × 有効処理量。数値は表示時のみ小数第3位に丸めます。</p>
+  </div>`;
+}
+
+function renderBatchCapacity() {
+  document.getElementById('capacity-preview').innerHTML = buildBatchCapacityHTML(data);
 }
 
 function getIndustryLabel(v) {
@@ -2949,6 +3074,7 @@ function generateResult() {
   // ---- フロー図（SVG生成 — buildFlowSVG に委譲）----
   document.getElementById('result-flow').innerHTML = buildFlowSVG(data);
   renderMissingCheck(validation);
+  document.getElementById('result-capacity').innerHTML = buildBatchCapacityHTML(data);
 
   // ---- データテーブル ----
   const sensorSummary = WizardCore.calculateSensors(data).details.join('、');
@@ -3128,6 +3254,7 @@ document.addEventListener('keydown', e => {
 
 // Init
 updateFlowPreview();
+renderBatchCapacity();
 loadFromLocalStorage();
 </script>
 </body>
