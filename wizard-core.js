@@ -41,6 +41,17 @@
     return Array.isArray(value) ? value.filter(Boolean) : [];
   }
 
+  const EQUIPMENT_KINDS = ['ポンプ', '攪拌機', 'その他'];
+  const EQUIPMENT_TANKS = ['原水槽', '凝集沈殿槽', '中継槽', '汚泥貯槽', '監視槽', 'ろ過受け槽'];
+
+  function getEquipmentTanks(data) {
+    return EQUIPMENT_TANKS.filter(tank => {
+      if (tank === '原水槽' || tank === '凝集沈殿槽') return true;
+      if (tank === 'ろ過受け槽') return Boolean(data.filter_branches) && !['不明', 'ろ過しない'].includes(data.filter_branches);
+      return asArray(data.option_tanks).includes(tank);
+    });
+  }
+
   function normalizeData(raw) {
     const source = raw && typeof raw === 'object' ? raw : {};
     const normalized = createInitialData();
@@ -56,7 +67,9 @@
     // Keep deleted row placeholders while the wizard is open. The DOM uses the
     // original row index for subsequent edits, so compacting this array corrupts data.
     normalized.extra_pumps = Array.isArray(source.extra_pumps)
-      ? source.extra_pumps.map((pump) => pump && typeof pump === 'object' ? pump : null)
+      ? source.extra_pumps.map((pump) => pump && typeof pump === 'object' ? {
+        ...pump, kind: asString(pump.kind), tank: asString(pump.tank)
+      } : null)
       : [];
     normalized.chem_details = source.chem_details && typeof source.chem_details === 'object' ? source.chem_details : {};
 
@@ -214,12 +227,18 @@
     if (data.sensor_other_selected && (!isPresent(data.sensor_other_count) || !isPresent(data.sensor_other_note))) {
       errors.push('その他のレベルセンサーは、台数と設置箇所を入力してください。');
     }
-    asArray(data.extra_pumps).forEach((pump) => {
+    asArray(data.extra_pumps).forEach((pump, index) => {
       ['count', 'lph', 'amp'].forEach((field) => {
         if (isPresent(pump[field]) && (!Number.isFinite(Number(pump[field])) || Number(pump[field]) < 0)) {
-          errors.push('追加ポンプの台数・容量・定格電流は0以上の数値で入力してください。');
+          errors.push('追加機器の台数・容量・定格電流は0以上の数値で入力してください。');
         }
       });
+      if (isPresent(pump.count) && !Number.isSafeInteger(Number(pump.count))) errors.push('追加機器の台数は整数で入力してください。');
+      if (Number(pump.count) === 0 && isPresent(pump.count)) return;
+      const label = `追加機器${index + 1}（${pump.name || '名称未入力'}）`;
+      addWarning(!EQUIPMENT_KINDS.includes(pump.kind), `${label}の機器種別を選択してください。`);
+      addWarning(!EQUIPMENT_TANKS.includes(pump.tank), `${label}の設置槽を選択してください。`);
+      addWarning(EQUIPMENT_TANKS.includes(pump.tank) && !getEquipmentTanks(data).includes(pump.tank), `${label}の設置槽（${pump.tank}）が現在の構成にありません。`);
     });
 
     addWarning(!isPresent(data.customer_name), '顧客名');
@@ -240,6 +259,9 @@
   }
 
   root.WizardCore = {
+    EQUIPMENT_KINDS,
+    EQUIPMENT_TANKS,
+    getEquipmentTanks,
     createInitialData,
     normalizeData,
     getOtherChemicalKeys,

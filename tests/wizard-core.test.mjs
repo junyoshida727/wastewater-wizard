@@ -64,6 +64,27 @@ test('deleted extra pump placeholders remain aligned with open form rows', () =>
   assert.equal(data.extra_pumps[2].name, 'C');
 });
 
+test('equipment placement survives draft round trips and legacy rows remain explicitly unassigned', () => {
+  const data = core.normalizeData({ extra_pumps: [null, { name: '旧設備', count: '2' }, { kind: '攪拌機', tank: '原水槽', name: '攪拌', count: '1' }] });
+  assert.equal(data.extra_pumps[1].kind, '');
+  assert.equal(data.extra_pumps[1].tank, '');
+  assert.deepEqual(plain(core.normalizeData(JSON.parse(JSON.stringify(data)))), plain(data));
+  assert.ok(core.validateData(data).warnings.some(w => w.includes('旧設備') && w.includes('設置槽')));
+});
+
+test('equipment validation catches removed tanks and fractional counts without silently changing placement', () => {
+  const data = core.normalizeData({ extra_pumps: [{ kind: 'ポンプ', tank: '中継槽', count: '1' }] });
+  assert.ok(core.validateData(data).warnings.some(w => w.includes('現在の構成にありません')));
+  data.option_tanks = ['中継槽'];
+  assert.equal(core.validateData(data).warnings.some(w => w.includes('追加機器')), false);
+  data.extra_pumps[0].count = '1.5';
+  assert.ok(core.validateData(data).errors.some(w => w.includes('整数')));
+  data.extra_pumps[0].count = '0';
+  data.option_tanks = [];
+  assert.equal(core.validateData(data).warnings.some(w => w.includes('追加機器')), false);
+  assert.equal(data.extra_pumps[0].tank, '中継槽');
+});
+
 test('validation rejects unsafe numeric contradictions and warns about instrument tank mismatches', () => {
   const invalid = core.normalizeData({
     ph_min: '11', ph_max: '2', raw_tank: 'なし', raw_tank_size: '3',

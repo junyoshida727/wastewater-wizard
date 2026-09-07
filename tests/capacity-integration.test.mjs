@@ -132,6 +132,26 @@ test('legacy draft results remain available with an explicit incomplete capacity
   assert.match(app.table.innerHTML, /既存案件/);
 });
 
+test('equipment row handlers persist placement, restore selected controls and transfer it to SVG and result output', () => {
+  const app = loadWizard();
+  app.input('customer_name', '機器配置確認');
+  app.run(`addPumpRow(); updateExtraPump(0, 'name', '原水攪拌機'); updateExtraPump(0, 'kind', '攪拌機'); updateExtraPump(0, 'tank', '原水槽'); updateExtraPump(0, 'count', '2');`);
+  const restored = loadWizard(app.storage);
+  restored.run('resumeDraft(); generateResult()');
+  assert.equal(restored.run('data.extra_pumps[0].kind'), '攪拌機');
+  assert.equal(restored.run('data.extra_pumps[0].tank'), '原水槽');
+  assert.match(restored.elements.get('result-flow').innerHTML, /data-equipment="AM-01" data-tank="TK-01"/);
+  assert.match(restored.table.innerHTML, /設置槽：原水槽/);
+  const row = restored.created.find(({ element }) => element.id === 'pump-row-0').element.innerHTML;
+  assert.match(row, /value="攪拌機" selected/);
+  assert.match(row, /value="原水槽" selected/);
+  restored.run(`updateExtraPump(0, 'tank', '中継槽'); generateResult()`);
+  assert.doesNotMatch(restored.elements.get('result-flow').innerHTML, /data-equipment="AM-01"/);
+  assert.match(restored.elements.get('result-missing-check').innerHTML, /現在の構成にありません/);
+  restored.run('startNewDraft(true)');
+  assert.equal(restored.run('data.extra_pumps.length'), 0);
+});
+
 test('invalid conditions replace old metrics and prevent result generation', () => {
   const app = loadWizard();
   app.fillCapacity();

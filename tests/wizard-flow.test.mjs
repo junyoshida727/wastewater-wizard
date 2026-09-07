@@ -25,13 +25,15 @@ test('engineering SVG is self-contained, accessible and has a schedule and title
   assert.match(svg, /data-instrument="LS"/);
 });
 
-test('upper supernatant and lower sludge retain separate paths without adding a raw pump', () => {
+test('standard transfer pump lifts raw water while upper supernatant and lower sludge stay separate', () => {
   const svg = build({ filter_branches: '2分岐' });
   const connections = edges(svg);
   assert.ok(connections.some(e => e.id === 'supernatant-discharge' && e.from === 'TK-02' && e.to === '放流'));
   assert.ok(connections.some(e => e.id === 'sludge-filter' && e.from === 'TK-02' && e.to === 'FL-01'));
   assert.ok(connections.some(e => e.id === 'filtrate-discharge' && e.from === 'FL-01'));
-  assert.doesNotMatch(svg, /原水ポンプ/);
+  assert.match(svg, /data-equipment="TP-01" data-tank="TK-01"/);
+  assert.doesNotMatch(svg, /data-equipment="TP-02"/);
+  assert.match(svg, /標準付属/);
 });
 
 test('selected relay, monitor and sludge tanks have distinct symbols and connected paths', () => {
@@ -41,6 +43,59 @@ test('selected relay, monitor and sludge tanks have distinct symbols and connect
     assert.ok(connections.some(e => e.from === from && e.to === to), `${from} → ${to}`);
   }
   assert.equal(connections.some(e => e.from === 'TK-02' && e.to === 'FL-01'), false);
+  assert.match(svg, /data-equipment="TP-01" data-tank="TK-01"/);
+  assert.match(svg, /data-equipment="TP-02" data-tank="TK-03"/);
+  assert.match(svg, /中継槽追加分/);
+  for (const id of ['raw-relay', 'reactor-inlet']) {
+    const route = svg.match(new RegExp(`data-pipe="${id}"[^>]* d="([^"]+)"`))[1];
+    const points = [...route.matchAll(/[ML]([\d.]+),([\d.]+)/g)].map(([, x, y]) => [Number(x), Number(y)]);
+    assert.ok(points.at(-1)[1] < points[0][1], 'pump delivery rises from the source vessel to the destination inlet');
+  }
+});
+
+test('instrument stems are solid while chemical dosing lines retain their own line type', () => {
+  const svg = build({ option_tanks: ['監視槽'], option_ph_tanks: ['監視槽'], option_turbidity_tanks: ['監視槽'], level_sensors: ['ろ過受け槽'], filter_branches: '2分岐', chemicals: ['酸'] });
+  const instruments = [...svg.matchAll(/<g data-instrument="[^"]+">([\s\S]*?)<\/g>/g)];
+  assert.ok(instruments.length >= 5);
+  for (const [, body] of instruments) assert.doesNotMatch(body, /stroke-dasharray/);
+  assert.match(svg, /data-kind="chemical"[^>]*stroke-dasharray/);
+});
+
+test('additional pumps and mixers are placed in selected vessels with counts and matching schedule tags', () => {
+  const svg = build({ raw_tank: 'あり', filter_branches: '2分岐', extra_pumps: [
+    { kind: '攪拌機', tank: '原水槽', name: '原水攪拌', count: '2', lph: '0.4', amp: '2.5' },
+    { kind: 'ポンプ', tank: '凝集沈殿槽', name: '循環', count: '1' },
+    { kind: 'その他', tank: 'ろ過受け槽', name: '予備機器', count: '1' }
+  ] });
+  assert.match(svg, /data-equipment="AM-01" data-tank="TK-01" data-kind="攪拌機"/);
+  assert.match(svg, /data-equipment="AP-02" data-tank="TK-02" data-kind="ポンプ"/);
+  assert.match(svg, /data-equipment="AE-03" data-tank="FL-01"/);
+  assert.match(svg, /2台 \/ 0.4kW \/ 2.5A/);
+  assert.match(svg.replace(/<[^>]+>/g, ''), /吐出先未確定/);
+  assert.equal(edges(svg).some(e => /AP-02/.test(e.from + e.to)), false);
+});
+
+test('unknown, removed and zero-count placements do not create phantom equipment or vessels', () => {
+  const data = { extra_pumps: [
+    { kind: '攪拌機', tank: '中継槽', name: '保持する機器', count: '1' },
+    { kind: 'ポンプ', tank: '原水槽', count: '0' },
+    { name: '旧ポンプ', count: '1' }
+  ] };
+  const svg = build(data);
+  assert.doesNotMatch(svg, /data-equipment="(?:AM-01|AP-02|AP-03|TK-03)"/);
+  assert.match(svg.replace(/<[^>]+>/g, ''), /構成外・要確認/);
+  assert.match(svg, /旧ポンプ/);
+  assert.match(build({ ...data, option_tanks: ['中継槽'] }), /data-equipment="AM-01" data-tank="TK-03"/);
+});
+
+test('many additional devices expand vessel and sheet without losing tags or escaping', () => {
+  const rows = Array.from({ length: 12 }, (_, i) => ({ kind: i % 2 ? 'ポンプ' : '攪拌機', tank: '原水槽', name: '<補助&機器>', count: '2' }));
+  const svg = build({ extra_pumps: rows });
+  assert.equal([...svg.matchAll(/data-equipment="A[MP]-\d+"/g)].length, 12);
+  assert.match(svg, /&lt;補助&amp;機器&gt;/);
+  const height = Number(svg.match(/viewBox="0 0 \d+ (\d+)"/)[1]);
+  assert.ok(height > 1500);
+  for (const [, y] of svg.matchAll(/<text[^>]* y="([\d.]+)"/g)) assert.ok(Number(y) < height - 24);
 });
 
 test('no filter or unknown filtration does not claim filtered discharge', () => {
