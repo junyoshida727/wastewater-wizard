@@ -110,6 +110,34 @@ test('transfer discharge rises through the source open top before travelling out
   }
 });
 
+test('transfer routes use two bends and a clear downward entry without crossing source instrument circles', () => {
+  for (const option_tanks of [[], ['中継槽']]) for (const withMixers of [false, true]) {
+    const svg = build({ option_tanks,
+      option_ph_tanks: ['原水槽', '中継槽'], option_turbidity_tanks: ['原水槽', '中継槽'], level_sensors: ['原水槽', '中継槽'],
+      extra_pumps: withMixers ? ['原水槽', '中継槽'].map(tank => ({ kind: '攪拌機', tank, count: '1' })) : [] });
+    for (const {id, to} of edges(svg).filter(e => ['raw-relay', 'reactor-inlet'].includes(e.id))) {
+      const path = svg.match(new RegExp(`data-pipe="${id}"[^>]* d="([^"]+)"`))[1];
+      const points = [...path.matchAll(/[ML]([\d.]+),([\d.]+)/g)].map(m => m.slice(1).map(Number));
+      assert.equal(points.length, 4, 'three straight segments with just two bends');
+      const [start, rise, across, end] = points;
+      assert.equal(start[0], rise[0]);
+      assert.ok(rise[1] < start[1]);
+      assert.equal(rise[1], across[1]);
+      assert.ok(across[0] > rise[0]);
+      assert.equal(across[0], end[0]);
+      const vessel = svg.match(new RegExp(`<g data-equipment="${to}"[^>]*><path d="M([\\d.]+),([\\d.]+)`));
+      assert.ok(across[1] < Number(vessel[2]), 'horizontal run clears the destination rim');
+      assert.ok(end[0] > Number(vessel[1]) && end[1] > Number(vessel[2]), 'arrow points down inside the destination');
+      assert.ok(end[1] - across[1] >= 20, 'final drop leaves room for a readable arrow');
+      const circles = [...svg.matchAll(/(?:data-part="motor"|data-instrument="[^"]+"[^>]*><circle) cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)];
+      for (const [, x, y, r] of circles) {
+        const nearestX = Math.max(rise[0], Math.min(across[0], Number(x)));
+        assert.ok(Math.hypot(Number(x) - nearestX, Number(y) - rise[1]) > Number(r) + 1.2, 'horizontal pipe clears motor and instrument circles');
+      }
+    }
+  }
+});
+
 test('transfer, auxiliary and dosing pumps all use a circle with P', () => {
   const svg = build({ option_tanks: ['中継槽'], chemicals: ['酸'], extra_pumps: [{ kind: 'ポンプ', tank: '原水槽', count: '1' }] });
   for (const tag of ['TP-01', 'TP-02', 'AP-01', 'DP-01']) {

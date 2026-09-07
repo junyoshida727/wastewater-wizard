@@ -184,11 +184,13 @@
       });
     };
     const transferPump = (source, target, id, edge) => {
-      const cx = source.x + 45, cy = source.y + 95, riser = source.x + source.w + 45;
-      const exitY = source.y - 15, entryY = Math.min(source.y, target.y) - 15;
+      const cx = source.x + 45, cy = source.y + 95;
+      // A single horizontal run clears both open rims and stays below source instruments.
+      // Extend the final drop into the vessel so its arrow remains clear without a short jog.
+      const routeY = Math.min(source.y - 15, target.y - 2);
       pieces.push(`<g data-equipment="${id}" data-tank="${source.id}" data-kind="transfer-pump">`);
       // Rise inside the source vessel and cross its side only above the open top.
-      pipe(edge, source.id, target.id, [[cx, cy - 15], [cx, exitY], [riser, exitY], [riser, entryY], [target.x + 18, entryY], [target.x + 18, target.y - 3]]);
+      pipe(edge, source.id, target.id, [[cx, cy - 15], [cx, routeY], [target.x + 18, routeY], [target.x + 18, target.y + 20]]);
       pumpSymbol(cx, cy);
       text(cx, cy + 31, id, 12, 'middle');
       pieces.push('</g>');
