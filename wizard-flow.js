@@ -12,7 +12,8 @@
     const hasRelay = selected('option_tanks', '中継槽');
     const hasMonitor = selected('option_tanks', '監視槽');
     const hasSludge = selected('option_tanks', '汚泥貯槽');
-    const filterConfigured = Boolean(d.filter_branches) && !['不明', 'ろ過しない'].includes(d.filter_branches);
+    const basketCount = new Map([['分岐なし', 1], ['2分岐', 2], ['3分岐', 3], ['4分岐', 4], ['5分岐', 5]]).get(d.filter_branches) || 0;
+    const filterConfigured = basketCount > 0;
     const powder = d.powder_feeder === '使用する';
     const chemicals = list(d.chemicals).filter(name => !(powder && name === '液体凝集剤'));
     const otherCount = d.chem_other_selected ? Number(d.chem_other_count) : 0;
@@ -45,7 +46,8 @@
     const coagCaptionY = Math.max(coag.y + coag.h + 24, raw.y + raw.h + 85, hasRelay ? relay.y + relay.h + 85 : 0);
     const lowerY = Math.max(Math.max(raw.y + raw.h, coag.y + coag.h, hasRelay ? relay.y + relay.h : 0, hasMonitor ? monitor.y + monitor.h : 0) + 115, coagCaptionY + (mixers('汚泥貯槽').length ? 125 : 95));
     const sludge = { id: 'TK-04', name: '汚泥貯槽', x: coag.x - 220, w: vesselWidth('汚泥貯槽'), y: lowerY, h: Math.max(120, 90 + located('汚泥貯槽').length * 60), extraY: 90 };
-    const filter = { id: 'FL-01', name: 'ろ過装置', x: Math.max(coag.x + 110, hasSludge ? sludge.x + sludge.w + 190 : 0), w: 150 + mixers('ろ過受け槽').length * 60, y: lowerY, h: 130 + located('ろ過受け槽').length * 60, extraY: 160 };
+    const basketAreaWidth = 30 + basketCount * 90;
+    const filter = { id: 'FL-01', name: 'ろ過装置', x: Math.max(coag.x + 110, hasSludge ? sludge.x + sludge.w + 190 : 0), w: basketAreaWidth + mixers('ろ過受け槽').length * 60, y: lowerY, h: 220 + located('ろ過受け槽').length * 60, extraY: 220 };
     const tanks = [raw, coag, ...(hasRelay ? [relay] : []), ...(hasMonitor ? [monitor] : []), ...(hasSludge ? [sludge] : []), ...(filterConfigured ? [{...filter, name: 'ろ過受け槽'}] : [])];
     const placement = item => {
       if (String(item.count ?? '').trim() !== '' && Number(item.count) === 0) return '図示なし';
@@ -67,7 +69,7 @@
       ...(hasRelay ? [[relay.id, relay.name, '選択あり / 容量未確定']] : []),
       ...(hasSludge ? [[sludge.id, sludge.name, '選択あり / 容量未確定']] : []),
       ...(hasMonitor ? [[monitor.id, monitor.name, '選択あり / 容量未確定']] : []),
-      ...(filterConfigured ? [[filter.id, filter.name, d.filter_branches]] : []),
+      ...(filterConfigured ? [[filter.id, filter.name, `${d.filter_branches} / カゴ${basketCount}個 / 共通のろ過受け槽`]] : []),
       ...feeds.flatMap(feed => feed.type === 'powder' ? [[feed.tag, feed.name, '使用する / 仕様未確定']] : [
         [feed.tag, feed.name, feed.detail], [feed.pump, '薬注ポンプ', `${feed.tag}用 / ${feed.amount}`]
       ]),
@@ -145,7 +147,7 @@
         pieces.push(`<g data-equipment="${item.tag}" data-tank="${tank.id}" data-kind="${esc(item.kind)}"><title>${esc(item.name || item.kind)} / ${esc(tank.name)}</title>`);
         if (item.kind === '攪拌機') {
           const receiver = tank.name === 'ろ過受け槽';
-          const mx = tank.x + (receiver ? 175 : tank === coag ? reactionWidth + 30 : 150) + mixerIndex++ * 60;
+          const mx = tank.x + (receiver ? basketAreaWidth + 25 : tank === coag ? reactionWidth + 30 : 150) + mixerIndex++ * 60;
           const motorY = tank.y + (receiver ? 55 : tank === coag ? -35 : -46);
           const bladeY = tank.y + (tank === coag ? straight - 60 : tank.h - 30);
           mixerSymbol(mx, motorY, bladeY);
@@ -261,16 +263,31 @@
     }
     if (filterConfigured) {
       const start = hasSludge ? [sludge.x + sludge.w, sludge.y + 50] : bottomPort;
-      pipe('sludge-filter', hasSludge ? sludge.id : coag.id, filter.id, hasSludge ? [start, [filter.x + 12, filter.y + 50]] : [start, [start[0], lowerY - 27], [filter.x + 75, lowerY - 27], [filter.x + 75, filter.y - 3]]);
+      const headerX = filter.x + basketAreaWidth / 2;
+      pipe('sludge-filter', hasSludge ? sludge.id : coag.id, filter.id, hasSludge
+        ? [start, [filter.x - 65, start[1]], [filter.x - 65, filter.y - 27], [headerX, filter.y - 27], [headerX, filter.y]]
+        : [start, [start[0], lowerY - 27], [headerX, lowerY - 27], [headerX, filter.y]]);
       pieces.push(`<g data-equipment="${filter.id}">`);
-      rect(filter.x + 15, filter.y, 120, 110, 'fill="white" stroke-width="1.8"');
-      line(filter.x + 15, filter.y, filter.x + 135, filter.y + 110);
-      line(filter.x + 135, filter.y, filter.x + 15, filter.y + 110);
-      pieces.push(`<path d="M${filter.x},${filter.y + 90} V${filter.y + filter.h} H${filter.x + filter.w} V${filter.y + 90}"/>`);
+      pieces.push(`<path d="M${filter.x},${filter.y + 90} V${filter.y + filter.h} H${filter.x + filter.w} V${filter.y + 90}" data-part="filter-receiver" stroke-width="1.8"/>`);
+      // A common header feeds one basket per selected branch, all within one receiver.
+      // Basket spacing is schematic; valve types and actual dimensions remain unspecified.
+      line(filter.x + 60, filter.y, filter.x + 60 + (basketCount - 1) * 90, filter.y, 'data-part="filter-header" stroke-width="2.4"');
+      for (let i = 0; i < basketCount; i++) {
+        const cx = filter.x + 60 + i * 90, top = filter.y + 108, bottom = top + 80;
+        const tag = `${filter.id}-B${String(i + 1).padStart(2, '0')}`;
+        pieces.push(`<g data-basket="${tag}" data-tank="${filter.id}"><title>ろ過カゴ ${i + 1}</title>`);
+        pieces.push(`<path d="M${cx - 30},${top} V${bottom} A30,8 0 0 0 ${cx + 30},${bottom} V${top}"/>`);
+        for (const dx of [-20, -10, 0, 10, 20]) line(cx + dx, top + 8, cx + dx, bottom + 4);
+        pieces.push(`<ellipse cx="${cx}" cy="${top}" rx="30" ry="8" fill="white"/>`);
+        text(cx, bottom + 22, `カゴ${i + 1}`, 12, 'middle');
+        pieces.push('</g>');
+        pipe(`filter-branch-${i + 1}`, filter.id, tag, [[cx, filter.y], [cx, top - 12]]);
+        pieces.push(`<circle cx="${cx}" cy="${filter.y}" r="3" fill="#20252b" stroke="none"/>`);
+      }
       pieces.push('</g>');
-      if (selected('level_sensors', 'ろ過受け槽')) instrument(filter.x - 30, filter.y + 80, 'LS', filter.y + filter.h - 8, filter.x + 6);
+      if (selected('level_sensors', 'ろ過受け槽')) instrument(filter.x - 30, filter.y + 50, 'LS', filter.y + filter.h - 8, filter.x + 6);
       additionalEquipment({...filter, name: 'ろ過受け槽'});
-      caption(filter, d.filter_branches);
+      caption(filter, `${d.filter_branches} / カゴ${basketCount}個 / ろ過受け槽`);
       pipe('filtrate-discharge', filter.id, 'ろ過水放流', [[filter.x + filter.w, filter.y + filter.h - 12], [drawingRight - 25, filter.y + filter.h - 12]]);
       text(drawingRight - 25, filter.y + filter.h - 28, 'ろ過水 → 放流', 14, 'end');
     } else if (!hasSludge) {

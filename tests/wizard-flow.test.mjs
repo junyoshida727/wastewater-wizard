@@ -157,13 +157,65 @@ test('many additional devices expand vessel and sheet without losing tags or esc
 });
 
 test('no filter or unknown filtration does not claim filtered discharge', () => {
-  for (const filter_branches of ['', '不明', 'ろ過しない']) {
+  for (const filter_branches of ['', '不明', 'ろ過しない', '999999分岐', 'toString']) {
     for (const option_tanks of [[], ['汚泥貯槽']]) {
       const svg = build({ filter_branches, option_tanks });
       assert.doesNotMatch(svg, /data-equipment="FL-01"|data-pipe="filtrate-discharge"/);
+      assert.doesNotMatch(svg, /data-basket=|data-pipe="filter-branch-/);
       assert.match(svg, /data-pipe="supernatant-discharge"/);
       assert.match(svg, /汚泥処理方法を確認/);
     }
+  }
+});
+
+test('selected branch count feeds that many baskets inside a single common receiver', () => {
+  for (const [tank_capacity, filter_branches, count] of [
+    ['200L', '2分岐', 2], ['500L', '3分岐', 3], ['1000L', '5分岐', 5],
+    ['1000L', '分岐なし', 1], ['200L', '4分岐', 4]
+  ]) {
+    for (const option_tanks of [[], ['汚泥貯槽']]) {
+      const svg = build({ tank_capacity, filter_branches, option_tanks });
+      const receiver = svg.match(/<path d="M([\d.]+),([\d.]+) V([\d.]+) H([\d.]+) V[\d.]+" data-part="filter-receiver"/);
+      const [, left, rim, bottom, right] = receiver.map(Number);
+      assert.equal([...svg.matchAll(/data-part="filter-receiver"/g)].length, 1);
+      const baskets = [...svg.matchAll(/<g data-basket="([^"]+)" data-tank="FL-01">([\s\S]*?)<\/g>/g)];
+      assert.equal(baskets.length, count);
+      const branches = edges(svg).filter(edge => edge.id.startsWith('filter-branch-'));
+      assert.equal(branches.length, count);
+      assert.equal(edges(svg).filter(edge => edge.id === 'filtrate-discharge').length, 1);
+      let previousRight = left;
+      for (const [, tag, body] of baskets) {
+        const [, x, y, rx] = body.match(/<ellipse cx="([\d.]+)" cy="([\d.]+)" rx="([\d.]+)"/).map(Number);
+        assert.ok(x - rx > previousRight && x + rx < right, 'baskets are separate and within receiver sides');
+        previousRight = x + rx;
+        const basketBottom = Number(body.match(/ V([\d.]+)/)[1]);
+        assert.ok(y - 8 > rim && basketBottom + 8 < bottom, 'whole basket sits inside receiver');
+        const branch = branches.find(edge => edge.to === tag);
+        assert.equal(branch.from, 'FL-01');
+        const route = svg.match(new RegExp(`data-pipe="${branch.id}"[^>]* d="M([\\d.]+),([\\d.]+) L([\\d.]+),([\\d.]+)"`)).slice(1).map(Number);
+        assert.equal(route[0], x);
+        assert.equal(route[2], x);
+        assert.ok(route[1] < rim && route[3] < y - 8 && route[3] > rim, 'branch enters through open top toward basket');
+      }
+      assert.match(svg, new RegExp(`カゴ${count}個`));
+    }
+  }
+});
+
+test('five baskets leave separate space for receiver mixers, pumps and level sensor', () => {
+  const svg = build({ filter_branches: '5分岐', level_sensors: ['ろ過受け槽'], extra_pumps: ['攪拌機', '攪拌機', 'ポンプ'].map(kind => ({ kind, tank: 'ろ過受け槽', count: '1' })) });
+  const baskets = [...svg.matchAll(/data-basket="[^"]+"[\s\S]*?<ellipse cx="([\d.]+)" cy="([\d.]+)"/g)];
+  const lastRight = Number(baskets.at(-1)[1]) + 30;
+  for (const tag of ['AM-01', 'AM-02']) {
+    const mixer = svg.match(new RegExp(`<g data-equipment="${tag}"[^>]*>([\\s\\S]*?)</g>`))[1];
+    assert.ok(Number(mixer.match(/data-part="motor" cx="([\d.]+)"/)[1]) - 25 > lastRight);
+  }
+  const pump = svg.match(/data-equipment="AP-03"[^>]*>[\s\S]*?<circle cx="[\d.]+" cy="([\d.]+)"/);
+  assert.ok(Number(pump[1]) - 15 > Number(baskets[0][2]) + 88, 'pump is below baskets');
+  assert.equal([...svg.matchAll(/data-instrument="LS"/g)].length, 2);
+  const [, width, height] = svg.match(/viewBox="0 0 (\d+) (\d+)"/).map(Number);
+  for (const [, x, y] of svg.matchAll(/<text x="([\d.]+)" y="([\d.]+)"/g)) {
+    assert.ok(Number(x) < width - 24 && Number(y) < height - 24, 'expanded sheet contains labels');
   }
 });
 
