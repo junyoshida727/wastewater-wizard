@@ -11,6 +11,10 @@ const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1];
 function loadWizard(storage = new Map()) {
   const makeElement = () => ({
     value: '', textContent: '', innerHTML: '', style: {}, dataset: {},
+    attributes: {},
+    setAttribute(key, value) { this.attributes[key] = value; },
+    getAttribute(key) { return this.attributes[key] ?? null; },
+    click() { this.clicked = true; },
     classList: { add() {}, remove() {}, contains() { return false; } },
     querySelectorAll() { return []; },
     closest() { return { querySelectorAll() { return []; } }; },
@@ -19,14 +23,21 @@ function loadWizard(storage = new Map()) {
   const elements = new Map([...html.matchAll(/\bid="([^"]+)"/g)].map(([, id]) => [id, makeElement()]));
   const inputs = [...html.matchAll(/<(?:input|select|textarea)\b[^>]*\bid="([^"]+)"/g)].map(([, id]) => elements.get(id));
   const table = makeElement();
+  const flowSVG = makeElement();
+  flowSVG.setAttribute('width', '1680');
+  const created = [];
+  const downloads = [];
+  const timers = [];
+  const revoked = [];
   const alerts = [];
   const confirmations = [];
   const context = vm.createContext({
     document: {
       getElementById: id => elements.get(id) || null,
-      querySelector: selector => selector === '#result-data-table tbody' ? table : makeElement(),
+      querySelector: selector => selector === '#result-data-table tbody' ? table : selector === '#result-flow svg' ? flowSVG : makeElement(),
       querySelectorAll: selector => selector === '#main-container input, #main-container select, #main-container textarea' ? inputs : [],
-      createElement: makeElement,
+      createElement: tag => { const element = makeElement(); created.push({ tag, element }); return element; },
+      body: { appendChild() {} },
       addEventListener() {}
     },
     localStorage: {
@@ -34,12 +45,18 @@ function loadWizard(storage = new Map()) {
       setItem: (key, value) => storage.set(key, value),
       removeItem: key => storage.delete(key)
     },
-    setTimeout() {}, clearTimeout() {},
+    Blob,
+    URL: {
+      createObjectURL: blob => { downloads.push(blob); return 'blob:test-flow'; },
+      revokeObjectURL: url => revoked.push(url)
+    },
+    setTimeout: callback => timers.push(callback), clearTimeout() {},
     alert: message => alerts.push(message),
     confirm: message => { confirmations.push(message); return true; }
   });
   context.window = context;
   vm.runInContext(readFileSync('wizard-core.js', 'utf8'), context);
+  vm.runInContext(readFileSync('wizard-flow.js', 'utf8'), context);
   vm.runInContext(script, context);
   const run = code => vm.runInContext(code, context);
   const input = (id, value) => {
@@ -56,7 +73,7 @@ function loadWizard(storage = new Map()) {
     input('working_volume_percent', '80');
     selectCapacity('500L');
   };
-  return { elements, run, input, selectCapacity, fillCapacity, storage, alerts, confirmations, table };
+  return { elements, run, input, selectCapacity, fillCapacity, storage, alerts, confirmations, table, flowSVG, created, downloads, timers, revoked };
 }
 
 test('real input handlers recalculate and persist conditions; result/PDF uses identical calculations', () => {
@@ -133,4 +150,37 @@ test('capacity calculation basis is escaped when rendering malformed draft value
   assert.doesNotMatch(rendered, /<img/);
   assert.match(rendered, /&lt;img/);
   assert.match(rendered, /data-status="invalid"/);
+});
+
+test('flow size controls switch between natural size and fit, and regeneration resets the zoom', () => {
+  const app = loadWizard();
+  app.run('setFlowScale(true)');
+  assert.equal(app.flowSVG.style.width, '1680px');
+  assert.equal(app.elements.get('flow-actual').getAttribute('aria-pressed'), 'true');
+  assert.equal(app.elements.get('flow-fit').getAttribute('aria-pressed'), 'false');
+  app.run('setFlowScale(false)');
+  assert.equal(app.flowSVG.style.width, '100%');
+  app.run('setFlowScale(true); generateResult()');
+  assert.equal(app.flowSVG.style.width, '100%');
+  assert.equal(app.elements.get('flow-fit').getAttribute('aria-pressed'), 'true');
+});
+
+test('SVG download is an independent vector document with the current drawing and a safe filename', async () => {
+  const app = loadWizard();
+  app.input('customer_name', '確認/案件:SVG');
+  app.selectCapacity('200L');
+  app.run('downloadFlowSVG()');
+  assert.equal(app.downloads.length, 1);
+  assert.equal(app.downloads[0].type, 'image/svg+xml;charset=utf-8');
+  const content = await app.downloads[0].text();
+  assert.ok(content.startsWith('<?xml version="1.0" encoding="UTF-8"?>\n<svg'));
+  assert.match(content, /200L/);
+  assert.match(content, /機器一覧・入力仕様/);
+  assert.doesNotMatch(content, /capacity-section|<html|<script/);
+  const link = app.created.find(item => item.tag === 'a').element;
+  assert.equal(link.download, '確認_案件_SVG_概略フロー図.svg');
+  assert.equal(link.href, 'blob:test-flow');
+  assert.equal(link.clicked, true);
+  app.timers.forEach(callback => callback());
+  assert.deepEqual(app.revoked, ['blob:test-flow']);
 });
