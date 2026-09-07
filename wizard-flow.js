@@ -31,16 +31,21 @@
     }));
     const located = name => extras.filter(item => item.tank === name && ['ポンプ', '攪拌機', 'その他'].includes(item.kind)
       && (String(item.count ?? '').trim() === '' || (Number.isSafeInteger(Number(item.count)) && Number(item.count) > 0)));
-    const raw = { id: 'TK-01', name: '原水槽', x: 80, w: 140, y: 510, h: Math.max(160, 150 + located('原水槽').length * 60), extraY: 150 };
-    const relay = { id: 'TK-03', name: '中継槽', x: 330, w: 140, y: 510, h: Math.max(160, 150 + located('中継槽').length * 60), extraY: 150 };
+    const mixers = name => located(name).filter(item => item.kind === '攪拌機');
+    const instrumentCount = name => Number(selected('option_ph_tanks', name)) + Number(selected('option_turbidity_tanks', name)) + Number(selected('level_sensors', name));
+    // Separate top-mounted mixers from pump/label space on the left and instruments on the right.
+    const vesselWidth = name => mixers(name).length ? 180 + (mixers(name).length - 1) * 60 + instrumentCount(name) * 45 : 140;
+    const raw = { id: 'TK-01', name: '原水槽', x: 80, w: vesselWidth('原水槽'), y: 510, h: Math.max(160, 150 + located('原水槽').length * 60), extraY: 150 };
+    const relay = { id: 'TK-03', name: '中継槽', x: raw.x + raw.w + 110, w: vesselWidth('中継槽'), y: 510, h: Math.max(160, 150 + located('中継槽').length * 60), extraY: 150 };
     const straight = Math.max(150, 160 + located('凝集沈殿槽').length * 60);
-    const coag = { id: 'TK-02', name: '凝集沈殿槽', x: hasRelay ? 600 : 360, w: Math.max(200, feeds.length * 18 + 120), y: 490, h: straight + 80, extraY: 170 };
-    const monitor = { id: 'TK-05', name: '監視槽', x: coag.x + coag.w + 110, w: 140, y: 510, h: Math.max(140, 90 + located('監視槽').length * 60), extraY: 90 };
+    const reactionWidth = Math.max(200, feeds.length * 18 + 120);
+    const coag = { id: 'TK-02', name: '凝集沈殿槽', x: hasRelay ? relay.x + relay.w + 130 : raw.x + raw.w + 140, w: reactionWidth + mixers('凝集沈殿槽').length * 60 + (mixers('凝集沈殿槽').length ? 50 : 0), y: 490, h: straight + 80, extraY: 170 };
+    const monitor = { id: 'TK-05', name: '監視槽', x: coag.x + coag.w + 110, w: vesselWidth('監視槽'), y: 510, h: Math.max(140, 90 + located('監視槽').length * 60), extraY: 90 };
     const upperEnd = hasMonitor ? monitor.x + monitor.w + 140 : coag.x + coag.w + 180;
     const coagCaptionY = Math.max(coag.y + coag.h + 24, raw.y + raw.h + 85, hasRelay ? relay.y + relay.h + 85 : 0);
-    const lowerY = Math.max(Math.max(raw.y + raw.h, coag.y + coag.h, hasRelay ? relay.y + relay.h : 0, hasMonitor ? monitor.y + monitor.h : 0) + 115, coagCaptionY + 95);
-    const sludge = { id: 'TK-04', name: '汚泥貯槽', x: coag.x - 220, w: 140, y: lowerY, h: Math.max(120, 90 + located('汚泥貯槽').length * 60), extraY: 90 };
-    const filter = { id: 'FL-01', name: 'ろ過装置', x: coag.x + 110, w: 150, y: lowerY, h: 130 + located('ろ過受け槽').length * 60, extraY: 160 };
+    const lowerY = Math.max(Math.max(raw.y + raw.h, coag.y + coag.h, hasRelay ? relay.y + relay.h : 0, hasMonitor ? monitor.y + monitor.h : 0) + 115, coagCaptionY + (mixers('汚泥貯槽').length ? 125 : 95));
+    const sludge = { id: 'TK-04', name: '汚泥貯槽', x: coag.x - 220, w: vesselWidth('汚泥貯槽'), y: lowerY, h: Math.max(120, 90 + located('汚泥貯槽').length * 60), extraY: 90 };
+    const filter = { id: 'FL-01', name: 'ろ過装置', x: Math.max(coag.x + 110, hasSludge ? sludge.x + sludge.w + 190 : 0), w: 150 + mixers('ろ過受け槽').length * 60, y: lowerY, h: 130 + located('ろ過受け槽').length * 60, extraY: 160 };
     const tanks = [raw, coag, ...(hasRelay ? [relay] : []), ...(hasMonitor ? [monitor] : []), ...(hasSludge ? [sludge] : []), ...(filterConfigured ? [{...filter, name: 'ろ過受け槽'}] : [])];
     const placement = item => {
       if (String(item.count ?? '').trim() !== '' && Number(item.count) === 0) return '図示なし';
@@ -127,19 +132,31 @@
       pieces.push(`<circle cx="${cx}" cy="${cy}" r="${radius}" fill="white"/>`);
       text(cx, cy + 5, 'P', 16, 'middle');
     };
+    const mixerSymbol = (cx, motorY, bladeY, bladeX = cx) => {
+      pieces.push(`<circle data-part="motor" cx="${cx}" cy="${motorY}" r="18" fill="white"/>`);
+      text(cx, motorY + 6, 'M', 17, 'middle');
+      line(cx, motorY + 18, bladeX, bladeY, 'data-part="shaft"');
+      pieces.push(`<ellipse data-part="blade" cx="${bladeX - 12}" cy="${bladeY}" rx="13" ry="5" fill="white"/><ellipse data-part="blade" cx="${bladeX + 12}" cy="${bladeY}" rx="13" ry="5" fill="white"/>`);
+    };
     const additionalEquipment = tank => {
+      let mixerIndex = 0;
       located(tank.name).forEach((item, i) => {
         const cx = tank.x + 28, cy = tank.y + tank.extraY + i * 60;
         pieces.push(`<g data-equipment="${item.tag}" data-tank="${tank.id}" data-kind="${esc(item.kind)}"><title>${esc(item.name || item.kind)} / ${esc(tank.name)}</title>`);
-        if (item.kind === 'ポンプ') pumpSymbol(cx, cy);
-        else if (item.kind === '攪拌機') {
-          pieces.push(`<circle cx="${cx}" cy="${cy - 8}" r="11" fill="white"/>`);
-          text(cx, cy - 4, 'M', 12, 'middle');
-          line(cx, cy + 3, cx, cy + 22);
-          pieces.push(`<path d="M${cx - 12},${cy + 18} L${cx + 12},${cy + 24} M${cx - 12},${cy + 24} L${cx + 12},${cy + 18}"/>`);
-        } else rect(cx - 12, cy - 12, 24, 24, 'fill="white"');
-        text(cx + 23, cy - 2, item.tag, 12);
-        text(cx + 23, cy + 15, `${item.count || '?'}台`, 11);
+        if (item.kind === '攪拌機') {
+          const receiver = tank.name === 'ろ過受け槽';
+          const mx = tank.x + (receiver ? 175 : tank === coag ? reactionWidth + 30 : 150) + mixerIndex++ * 60;
+          const motorY = tank.y + (receiver ? 55 : tank === coag ? -35 : -46);
+          const bladeY = tank.y + (tank === coag ? straight - 60 : tank.h - 30);
+          mixerSymbol(mx, motorY, bladeY);
+          text(mx, tank === coag ? bladeY + 25 : motorY - 27, item.tag, 12, 'middle');
+          text(mx, bladeY + (tank === coag ? 42 : 20), `${item.count || '?'}台`, 11, 'middle');
+        } else {
+          if (item.kind === 'ポンプ') pumpSymbol(cx, cy);
+          else rect(cx - 12, cy - 12, 24, 24, 'fill="white"');
+          text(cx + 23, cy - 2, item.tag, 12);
+          text(cx + 23, cy + 15, `${item.count || '?'}台`, 11);
+        }
         pieces.push('</g>');
       });
     };
@@ -159,10 +176,7 @@
         pieces.push(`<path d="M${tank.x},${tank.y} V${tank.y + straight} L${tank.x + tank.w / 2 - 18},${tank.y + tank.h} H${tank.x + tank.w / 2 + 18} L${tank.x + tank.w},${tank.y + straight} V${tank.y}" fill="white" stroke-width="2"/>`);
         // Schematic mixer; no inferred power, make, motor control or dimensions.
         const mx = tank.x + 62;
-        pieces.push(`<circle cx="${mx}" cy="${tank.y - 35}" r="18" fill="white"/>`);
-        text(mx, tank.y - 29, 'M', 17, 'middle');
-        line(mx, tank.y - 17, mx + 18, tank.y + 132);
-        pieces.push(`<ellipse cx="${mx + 8}" cy="${tank.y + 132}" rx="14" ry="5"/><ellipse cx="${mx + 33}" cy="${tank.y + 129}" rx="14" ry="5"/>`);
+        mixerSymbol(mx, tank.y - 35, tank.y + 132, mx + 18);
       } else {
         pieces.push(`<path d="M${tank.x},${tank.y} V${tank.y + tank.h} H${tank.x + tank.w} V${tank.y}" fill="white" stroke-width="2"/>`);
       }
@@ -198,7 +212,7 @@
     // Each dosing source has its own line and its own vessel entry point.
     feeds.forEach((feed, i) => {
       const x = Math.max(65, coag.x + coag.w / 2 - (feeds.length - 1) * 85 - 58) + i * 170;
-      const portX = coag.x + 95 + (i + 1) * (coag.w - 140) / (feeds.length + 1);
+      const portX = coag.x + 95 + (i + 1) * (reactionWidth - 140) / (feeds.length + 1);
       const routeY = 365 + i * Math.min(6, 60 / Math.max(1, feeds.length - 1));
       pipe(`feed-${i + 1}`, feed.tag, coag.id, [[x + 58, 340], [x + 58, routeY], [portX, routeY], [portX, coag.y - 3]], feed.type === 'liquid' ? 'chemical' : 'powder');
       pieces.push(`<g data-equipment="${feed.tag}">`);
@@ -249,9 +263,9 @@
       const start = hasSludge ? [sludge.x + sludge.w, sludge.y + 50] : bottomPort;
       pipe('sludge-filter', hasSludge ? sludge.id : coag.id, filter.id, hasSludge ? [start, [filter.x + 12, filter.y + 50]] : [start, [start[0], lowerY - 27], [filter.x + 75, lowerY - 27], [filter.x + 75, filter.y - 3]]);
       pieces.push(`<g data-equipment="${filter.id}">`);
-      rect(filter.x + 15, filter.y, filter.w - 30, 110, 'fill="white" stroke-width="1.8"');
-      line(filter.x + 15, filter.y, filter.x + filter.w - 15, filter.y + 110);
-      line(filter.x + filter.w - 15, filter.y, filter.x + 15, filter.y + 110);
+      rect(filter.x + 15, filter.y, 120, 110, 'fill="white" stroke-width="1.8"');
+      line(filter.x + 15, filter.y, filter.x + 135, filter.y + 110);
+      line(filter.x + 135, filter.y, filter.x + 15, filter.y + 110);
       pieces.push(`<path d="M${filter.x},${filter.y + 90} V${filter.y + filter.h} H${filter.x + filter.w} V${filter.y + 90}"/>`);
       pieces.push('</g>');
       if (selected('level_sensors', 'ろ過受け槽')) instrument(filter.x - 30, filter.y + 80, 'LS', filter.y + filter.h - 8, filter.x + 6);
@@ -261,9 +275,9 @@
       text(drawingRight - 25, filter.y + filter.h - 28, 'ろ過水 → 放流', 14, 'end');
     } else if (!hasSludge) {
       pipe('sludge-unconfirmed', coag.id, '汚泥処理要確認', [bottomPort, [bottomPort[0], lowerY + 17]]);
-      rect(coag.x + 5, lowerY + 25, 190, 76, 'stroke-dasharray="6 4"');
-      text(coag.x + 100, lowerY + 55, d.filter_branches === 'ろ過しない' ? 'ろ過なし' : 'ろ過条件未確認', 15, 'middle');
-      text(coag.x + 100, lowerY + 81, '汚泥処理方法を確認', 13, 'middle');
+      rect(bottomPort[0] - 95, lowerY + 25, 190, 76, 'stroke-dasharray="6 4"');
+      text(bottomPort[0], lowerY + 55, d.filter_branches === 'ろ過しない' ? 'ろ過なし' : 'ろ過条件未確認', 15, 'middle');
+      text(bottomPort[0], lowerY + 81, '汚泥処理方法を確認', 13, 'middle');
     }
     text(coag.x + coag.w / 2 + 16, bottomPort[1] + 65, '汚泥', 14);
     if (hasSludge && !filterConfigured) {

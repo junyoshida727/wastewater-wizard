@@ -103,6 +103,36 @@ test('additional pumps and mixers are placed in selected vessels with counts and
   assert.equal(edges(svg).some(e => /AP-02/.test(e.from + e.to)), false);
 });
 
+test('additional mixers have motors above the vessel, shafts crossing the water level, and two submerged blades', () => {
+  const names = ['原水槽', '凝集沈殿槽', '中継槽', '汚泥貯槽', '監視槽', 'ろ過受け槽'];
+  const ids = ['TK-01', 'TK-02', 'TK-03', 'TK-04', 'TK-05', 'FL-01'];
+  const svg = build({ option_tanks: ['中継槽', '汚泥貯槽', '監視槽'], filter_branches: '2分岐', extra_pumps: names.map(tank => ({ kind: '攪拌機', tank, count: '2' })) });
+  for (let i = 0; i < names.length; i++) {
+    const vessel = svg.match(new RegExp(`<g data-equipment="${ids[i]}"[^>]*>([\\s\\S]*?)</g>`))[1];
+    const rim = Number(vessel.match(/<path d="M[\d.]+,([\d.]+) V/)[1]);
+    const mixer = svg.match(new RegExp(`<g data-equipment="AM-0${i + 1}"[^>]*>([\\s\\S]*?)</g>`))[1];
+    const motor = mixer.match(/data-part="motor" cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/);
+    assert.ok(Number(motor[2]) + Number(motor[3]) < rim, names[i] + ': motor is above the open top');
+    const shaft = mixer.match(/<line x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)" data-part="shaft"/);
+    assert.equal(shaft[1], shaft[3], 'additional mixer shaft is vertical');
+    assert.ok(Number(shaft[2]) < rim && Number(shaft[4]) > rim + 48, 'shaft crosses into the liquid');
+    assert.equal([...mixer.matchAll(/data-part="blade"/g)].length, 2);
+    assert.match(mixer, />2台<\/text>/);
+  }
+});
+
+test('multiple mixers occupy separate lanes without colliding with instrument circles', () => {
+  const svg = build({ option_tanks: ['中継槽'], option_ph_tanks: ['中継槽'], option_turbidity_tanks: ['中継槽'], level_sensors: ['原水槽', '中継槽'], extra_pumps: ['原水槽', '原水槽', '中継槽', '中継槽'].map(tank => ({ kind: '攪拌機', tank, count: '1' })) });
+  const motors = [...svg.matchAll(/data-part="motor" cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)].map(m => m.slice(1).map(Number));
+  const meters = [...svg.matchAll(/data-instrument="[^"]+"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)].map(m => m.slice(1).map(Number));
+  assert.equal(motors.length, 5, 'four additional motors and the standard reactor motor');
+  const circles = [...motors, ...meters];
+  for (let i = 0; i < circles.length; i++) for (let j = i + 1; j < circles.length; j++) {
+    const [x, y, r] = circles[i], [x2, y2, r2] = circles[j];
+    assert.ok(Math.hypot(x - x2, y - y2) >= r + r2, 'motor and instrument circles remain separate');
+  }
+});
+
 test('unknown, removed and zero-count placements do not create phantom equipment or vessels', () => {
   const data = { extra_pumps: [
     { kind: '攪拌機', tank: '中継槽', name: '保持する機器', count: '1' },
