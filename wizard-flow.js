@@ -40,7 +40,19 @@
     const relay = { id: 'TK-03', name: '中継槽', x: raw.x + raw.w + 110, w: vesselWidth('中継槽'), y: 510, h: Math.max(160, 150 + located('中継槽').length * 60), extraY: 150 };
     const straight = Math.max(150, 160 + located('凝集沈殿槽').length * 60);
     const reactionWidth = Math.max(200, feeds.length * 18 + 120);
-    const coag = { id: 'TK-02', name: '凝集沈殿槽', x: hasRelay ? relay.x + relay.w + 130 : raw.x + raw.w + 140, w: reactionWidth + mixers('凝集沈殿槽').length * 60 + (mixers('凝集沈殿槽').length ? 50 : 0), y: 490, h: straight + 80, extraY: 170 };
+    const reactorProbeCount = 2 + Number(selected('option_turbidity_tanks', '凝集沈殿槽'));
+    const coag = { id: 'TK-02', name: '凝集沈殿槽', x: hasRelay ? relay.x + relay.w + 130 : raw.x + raw.w + 140, w: reactionWidth + mixers('凝集沈殿槽').length * 60 + (mixers('凝集沈殿槽').length ? 50 : 0) + reactorProbeCount * 45, y: 490, h: straight + 80, extraY: 170 };
+    const feedPortX = i => coag.x + 95 + (i + 1) * (reactionWidth - 140) / (feeds.length + 1);
+    const powderX = powder ? feedPortX(feeds.length - 1) - 58 : null;
+    let nextLiquidX = Math.max(65, coag.x + coag.w / 2 - (feeds.length - 1) * 85 - 58);
+    const feedLayouts = feeds.map((feed, i) => {
+      // Reserve the hopper directly above its port; liquid sources keep their own spaced slots.
+      if (feed.type === 'powder') return { x: powderX, portX: feedPortX(i) };
+      if (powder && nextLiquidX + 145 > powderX && nextLiquidX < powderX + 145) nextLiquidX = powderX + 170;
+      const x = nextLiquidX;
+      nextLiquidX += 170;
+      return { x, portX: feedPortX(i) };
+    });
     const monitor = { id: 'TK-05', name: '監視槽', x: coag.x + coag.w + 110, w: vesselWidth('監視槽'), y: 510, h: Math.max(140, 90 + located('監視槽').length * 60), extraY: 90 };
     const upperEnd = hasMonitor ? monitor.x + monitor.w + 140 : coag.x + coag.w + 180;
     const coagCaptionY = Math.max(coag.y + coag.h + 24, raw.y + raw.h + 85, hasRelay ? relay.y + relay.h + 85 : 0);
@@ -76,7 +88,7 @@
       if (!tanks.some(tank => tank.name === item.tank)) return item.tank + ' / 構成外・要確認';
       return item.tank + (item.kind === 'ポンプ' ? ' / 吐出先未確定' : '');
     };
-    const drawingRight = Math.max(1200, upperEnd + 40, filter.x + filter.w + 160, 70 + feeds.length * 170);
+    const drawingRight = Math.max(1200, upperEnd + 40, filter.x + filter.w + 160, 70 + feeds.length * 170, ...feedLayouts.map(feed => feed.x + 150));
     const tableX = drawingRight + 50;
     const width = tableX + 430;
     const equipment = [
@@ -142,13 +154,14 @@
       text(tank.x + tank.w / 2, tank.y + tank.h + 50, detail, 12, 'middle');
     };
     const instrument = (cx, cy, probe, targetY, targetX = cx, bendY = cy + 26) => {
-      pieces.push(`<g data-instrument="${probe.label}" data-equipment="${probe.tag}" data-tank="${probe.tank.id}"><circle cx="${cx}" cy="${cy}" r="18" fill="white"/><text x="${cx}" y="${cy + 5}" fill="#20252b" stroke="none" font-size="13" text-anchor="middle">${probe.label}</text><path d="M${cx},${cy + 18} V${bendY} H${targetX} V${targetY}" fill="none"/>`);
+      const stem = targetX === cx ? `M${cx},${cy + 18} V${targetY}` : `M${cx},${cy + 18} V${bendY} H${targetX} V${targetY}`;
+      pieces.push(`<g data-instrument="${probe.label}" data-equipment="${probe.tag}" data-tank="${probe.tank.id}"><circle cx="${cx}" cy="${cy}" r="18" fill="white"/><text x="${cx}" y="${cy + 5}" fill="#20252b" stroke="none" font-size="13" text-anchor="middle">${probe.label}</text><path d="${stem}" fill="none" ${probe.tank === coag ? `marker-end="url(#${prefix}-arrow)"` : ''}/>`);
       text(cx, cy - 27, probe.tag, 12, 'middle');
       pieces.push('</g>');
     };
     const instruments = tank => {
       probes.filter(probe => probe.tank.id === tank.id).forEach((probe, i) => tank === coag
-        ? instrument(tank.x + tank.w + 35 + i * 45, tank.y - 40, probe, tank.y + 40, tank.x + tank.w - 16 - i * 14, tank.y - 14 + i * 8)
+        ? instrument(tank.x + tank.w - 20 - (reactorProbeCount - 1 - i) * 45, tank.y - 40, probe, tank.y + 40)
         : instrument(tank.x + tank.w - 20 - i * 45, tank.y - 46, probe, tank.y + 40));
     };
     const pumpSymbol = (cx, cy, radius = 15) => {
@@ -236,10 +249,11 @@
 
     // Each dosing source has its own line and its own vessel entry point.
     feeds.forEach((feed, i) => {
-      const x = Math.max(65, coag.x + coag.w / 2 - (feeds.length - 1) * 85 - 58) + i * 170;
-      const portX = coag.x + 95 + (i + 1) * (reactionWidth - 140) / (feeds.length + 1);
+      const { x, portX } = feedLayouts[i];
       const routeY = 365 + i * Math.min(6, 60 / Math.max(1, feeds.length - 1));
-      pipe(`feed-${i + 1}`, feed.tag, coag.id, [[x + 58, 340], [x + 58, routeY], [portX, routeY], [portX, coag.y - 3]], feed.type === 'liquid' ? 'chemical' : 'powder');
+      pipe(`feed-${i + 1}`, feed.tag, coag.id, feed.type === 'powder'
+        ? [[portX, 340], [portX, coag.y - 3]]
+        : [[x + 58, 340], [x + 58, routeY], [portX, routeY], [portX, coag.y - 3]], feed.type === 'liquid' ? 'chemical' : 'powder');
       pieces.push(`<g data-equipment="${feed.tag}">`);
       text(x + 58, 210, feed.tag, 13, 'middle');
       if (feed.type === 'powder') {

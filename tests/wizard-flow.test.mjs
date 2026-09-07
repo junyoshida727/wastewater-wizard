@@ -303,6 +303,46 @@ test('five baskets leave separate space for receiver mixers, pumps and level sen
   }
 });
 
+test('powder hopper sits directly above a straight downward feed and stays separate from liquid sources', () => {
+  for (const count of [0, 1, 3, 10]) for (const option_tanks of [[], ['中継槽']]) {
+    const svg = build({ powder_feeder: '使用する', chemicals: Array.from({length: count}, (_, i) => `薬品${i}`), option_tanks });
+    const route = svg.match(/data-from="PF-01"[^>]* d="M([\d.]+),([\d.]+) L([\d.]+),([\d.]+)"[^>]*marker-end=/);
+    assert.ok(route, 'powder feed is one segment with an arrow');
+    assert.equal(route[1], route[3]);
+    assert.ok(Number(route[4]) > Number(route[2]));
+    const hopper = svg.match(/data-equipment="PF-01">[\s\S]*?<rect x="([\d.]+)"[^>]*width="36"/);
+    assert.ok(Math.abs(Number(hopper[1]) + 18 - Number(route[1])) < 0.000001);
+    for (const [, x, width] of svg.matchAll(/data-equipment="CH-\d+">[\s\S]*?<rect x="([\d.]+)"[^>]*width="([\d.]+)"/g)) {
+      assert.ok(Number(x) + Number(width) < Number(route[1]) - 48 || Number(x) > Number(route[1]) + 48, 'liquid tank does not overlap hopper');
+    }
+    assert.equal(edges(svg).filter(e => e.id.startsWith('feed-')).length, count + 1);
+  }
+});
+
+test('reactor instruments point vertically into the vessel in lanes clear of mixers and feed ports', () => {
+  for (const extraCount of [0, 2]) for (const powder_feeder of ['使用する', '使用しない']) {
+    const svg = build({ powder_feeder, chemicals: ['酸', 'アルカリ'], option_turbidity_tanks: ['凝集沈殿槽'],
+      extra_pumps: Array.from({length: extraCount}, () => ({kind: '攪拌機', tank: '凝集沈殿槽', count: '1'})) });
+    const probes = [...svg.matchAll(/data-instrument="[^"]+" data-equipment="[^"]+" data-tank="TK-02">([\s\S]*?)<\/g>/g)];
+    assert.equal(probes.length, 3);
+    const xs = [];
+    for (const [, body] of probes) {
+      const circle = body.match(/<circle cx="([\d.]+)" cy="([\d.]+)"/);
+      const stem = body.match(/<path d="M([\d.]+),([\d.]+) V([\d.]+)"[^>]*marker-end=/);
+      assert.ok(stem, 'straight vertical arrow with no horizontal bends');
+      assert.equal(stem[1], circle[1]);
+      assert.ok(Number(stem[2]) < 490 && Number(stem[3]) > 490);
+      xs.push(Number(circle[1]));
+    }
+    assert.ok(xs[1] - xs[0] >= 45 && xs[2] - xs[1] >= 45);
+    for (const [, x] of svg.matchAll(/data-part="motor" cx="([\d.]+)"/g)) assert.ok(Number(x) + 36 < xs[0]);
+    for (const [, path] of svg.matchAll(/data-pipe="feed-\d+"[^>]* d="([^"]+)"/g)) {
+      const end = [...path.matchAll(/[ML]([\d.]+),([\d.]+)/g)].at(-1);
+      assert.ok(Number(end[1]) + 18 < xs[0], 'feed port stays left of the probe lane');
+    }
+  }
+});
+
 test('powder mode removes only the liquid coagulant pump and each other chemical has a separate line', () => {
   const svg = build({ powder_feeder: '使用する', chemicals: ['pH調整剤（酸）', '液体凝集剤', 'pH調整剤（アルカリ）'] });
   assert.match(svg, /data-equipment="PF-01"/);
