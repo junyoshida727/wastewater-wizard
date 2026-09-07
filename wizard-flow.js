@@ -123,8 +123,9 @@
         ? instrument(tank.x + tank.w + 35 + i * 45, tank.y - 40, label, tank.y + 40, tank.x + tank.w - 16 - i * 14, tank.y - 14 + i * 8)
         : instrument(tank.x + tank.w - 20 - i * 45, tank.y - 46, label, tank.y + 40));
     };
-    const pumpSymbol = (cx, cy) => {
-      pieces.push(`<circle cx="${cx}" cy="${cy}" r="15" fill="white"/><path d="M${cx - 7},${cy - 9} L${cx + 10},${cy} L${cx - 7},${cy + 9} Z" fill="white"/>`);
+    const pumpSymbol = (cx, cy, radius = 15) => {
+      pieces.push(`<circle cx="${cx}" cy="${cy}" r="${radius}" fill="white"/>`);
+      text(cx, cy + 5, 'P', 16, 'middle');
     };
     const additionalEquipment = tank => {
       located(tank.name).forEach((item, i) => {
@@ -144,8 +145,10 @@
     };
     const transferPump = (source, target, id, edge) => {
       const cx = source.x + 45, cy = source.y + 95, riser = source.x + source.w + 45;
+      const exitY = source.y - 15, entryY = Math.min(source.y, target.y) - 15;
       pieces.push(`<g data-equipment="${id}" data-tank="${source.id}" data-kind="transfer-pump">`);
-      pipe(edge, source.id, target.id, [[cx + 15, cy], [riser, cy], [riser, target.y - 15], [target.x + 18, target.y - 15], [target.x + 18, target.y - 3]]);
+      // Rise inside the source vessel and cross its side only above the open top.
+      pipe(edge, source.id, target.id, [[cx, cy - 15], [cx, exitY], [riser, exitY], [riser, entryY], [target.x + 18, entryY], [target.x + 18, target.y - 3]]);
       pumpSymbol(cx, cy);
       text(cx, cy + 31, id, 12, 'middle');
       pieces.push('</g>');
@@ -189,7 +192,7 @@
     text(375, 137, '薬品投入（各別配管）', 12);
     line(580, 132, 630, 132, `stroke-width="1.5" marker-end="url(#${prefix}-arrow)"`);
     text(640, 137, '粉体投入', 12);
-    text(54, 160, 'M：撹拌機  /  pH：pH計  /  TU：濁度計  /  LS：液位検出', 12);
+    text(54, 160, 'P：ポンプ  /  M：撹拌機  /  pH：pH計  /  TU：濁度計  /  LS：液位検出', 12);
     text(54, 179, '破線の槽：有無・設置を要確認。線の交差部は接続なし。', 12);
 
     // Each dosing source has its own line and its own vessel entry point.
@@ -208,7 +211,9 @@
         rect(x + 22, 232, 72, 63, 'fill="white" stroke-width="1.8"');
         line(x + 23, 254, x + 93, 254);
         line(x + 58, 295, x + 58, 302);
-        pieces.push(`<g data-equipment="${feed.pump}"><circle cx="${x + 58}" cy="316" r="14" fill="white"/><path d="M${x + 47},323 L${x + 58},304 L${x + 69},323 Z" fill="white"/></g>`);
+        pieces.push(`<g data-equipment="${feed.pump}">`);
+        pumpSymbol(x + 58, 316, 14);
+        pieces.push('</g>');
         line(x + 58, 330, x + 58, 340);
         text(x + 85, 321, feed.pump, 11);
       }

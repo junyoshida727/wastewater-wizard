@@ -36,6 +36,34 @@ test('standard transfer pump lifts raw water while upper supernatant and lower s
   assert.match(svg, /標準付属/);
 });
 
+test('transfer discharge rises through the source open top before travelling outside the vessel', () => {
+  for (const option_tanks of [[], ['中継槽']]) {
+    const svg = build({ option_tanks });
+    const sources = option_tanks.length ? [['raw-relay', 80, 220], ['reactor-inlet', 330, 470]] : [['reactor-inlet', 80, 220]];
+    for (const [id, left, right] of sources) {
+      const route = svg.match(new RegExp(`data-pipe="${id}"[^>]* d="([^"]+)"`))[1];
+      const points = [...route.matchAll(/[ML]([\d.]+),([\d.]+)/g)].map(([, x, y]) => [Number(x), Number(y)]);
+      assert.ok(points[0][0] > left && points[0][0] < right);
+      assert.ok(points[0][1] > 510, 'discharge starts inside the source tank');
+      assert.equal(points[1][0], points[0][0], 'first segment rises vertically from the pump');
+      assert.ok(points[1][1] < 510, 'first bend is above the source tank rim');
+      for (let i = 1; i < points.length; i++) {
+        if (points[i][0] !== points[i - 1][0]) assert.ok(points[i][1] < 510, 'horizontal discharge never penetrates a source tank wall');
+      }
+    }
+  }
+});
+
+test('transfer, auxiliary and dosing pumps all use a circle with P', () => {
+  const svg = build({ option_tanks: ['中継槽'], chemicals: ['酸'], extra_pumps: [{ kind: 'ポンプ', tank: '原水槽', count: '1' }] });
+  for (const tag of ['TP-01', 'TP-02', 'AP-01', 'DP-01']) {
+    const symbol = svg.match(new RegExp(`<g data-equipment="${tag}"[^>]*>([\\s\\S]*?)</g>`))[1];
+    assert.match(symbol, /<circle /);
+    assert.match(symbol, />P<\/text>/);
+    assert.doesNotMatch(symbol, /<path[^>]* Z"/);
+  }
+});
+
 test('selected relay, monitor and sludge tanks have distinct symbols and connected paths', () => {
   const svg = build({ option_tanks: ['中継槽', '監視槽', '汚泥貯槽'], filter_branches: '3分岐' });
   const connections = edges(svg);
