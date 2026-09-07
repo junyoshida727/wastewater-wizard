@@ -9,17 +9,24 @@ const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1];
 // Minimal DOM/storage stand-ins exercise the real application handlers without
 // adding a browser dependency. Layout and native controls are checked in-browser.
 function loadWizard(storage = new Map()) {
-  const makeElement = () => ({
-    value: '', textContent: '', innerHTML: '', style: {}, dataset: {},
-    attributes: {},
-    setAttribute(key, value) { this.attributes[key] = value; },
-    getAttribute(key) { return this.attributes[key] ?? null; },
-    click() { this.clicked = true; },
-    classList: { add() {}, remove() {}, contains() { return false; } },
-    querySelectorAll() { return []; },
-    closest() { return { querySelectorAll() { return []; } }; },
-    appendChild() {}, replaceChildren() {}, remove() {}
-  });
+  const makeElement = () => {
+    const classes = new Set();
+    return {
+      value: '', textContent: '', innerHTML: '', style: {}, dataset: {},
+      attributes: {},
+      setAttribute(key, value) { this.attributes[key] = value; },
+      getAttribute(key) { return this.attributes[key] ?? null; },
+      click() { this.clicked = true; },
+      classList: {
+        add(...names) { names.forEach(name => classes.add(name)); },
+        remove(...names) { names.forEach(name => classes.delete(name)); },
+        contains(name) { return classes.has(name); }
+      },
+      querySelectorAll() { return []; },
+      closest() { return { querySelectorAll() { return []; } }; },
+      appendChild() {}, replaceChildren() {}, remove() {}
+    };
+  };
   const elements = new Map([...html.matchAll(/\bid="([^"]+)"/g)].map(([, id]) => [id, makeElement()]));
   const inputs = [...html.matchAll(/<(?:input|select|textarea)\b[^>]*\bid="([^"]+)"/g)].map(([, id]) => elements.get(id));
   const table = makeElement();
@@ -31,10 +38,16 @@ function loadWizard(storage = new Map()) {
   const revoked = [];
   const alerts = [];
   const confirmations = [];
+  const selectors = new Map();
   const context = vm.createContext({
     document: {
       getElementById: id => elements.get(id) || null,
-      querySelector: selector => selector === '#result-data-table tbody' ? table : selector === '#result-flow svg' ? flowSVG : makeElement(),
+      querySelector: selector => {
+        if (selector === '#result-data-table tbody') return table;
+        if (selector === '#result-flow svg') return flowSVG;
+        if (!selectors.has(selector)) selectors.set(selector, makeElement());
+        return selectors.get(selector);
+      },
       querySelectorAll: selector => selector === '#main-container input, #main-container select, #main-container textarea' ? inputs : [],
       createElement: tag => { const element = makeElement(); created.push({ tag, element }); return element; },
       body: { appendChild() {} },
@@ -203,4 +216,57 @@ test('SVG download is an independent vector document with the current drawing an
   assert.equal(link.clicked, true);
   app.timers.forEach(callback => callback());
   assert.deepEqual(app.revoked, ['blob:test-flow']);
+});
+
+test('live preview immediately follows filtration and optional vessels, including draft restoration', () => {
+  const app = loadWizard();
+  app.input('customer_name', 'プレビュー検証');
+  for (const [value, count] of [['2分岐', 2], ['5分岐', 5], ['分岐なし', 1], ['ろ過しない', 0], ['不明', 0], ['', 0]]) {
+    app.run(`selectRadio('filter_branches', ${JSON.stringify(value)}, document.getElementById('filter_branches'))`);
+    for (const id of ['fn-filter', 'fa-filtrate', 'fn-filtrate']) assert.equal(app.elements.get(id).style.display, count ? '' : 'none');
+    assert.equal(app.elements.get('fn-sludge-unconfirmed').style.display, count ? 'none' : '');
+    assert.equal(app.elements.get('preview-filter-detail').textContent, count ? `${value} / カゴ${count}個` : '');
+    const svg = app.run('buildFlowSVG(data)');
+    assert.equal(svg.includes('data-equipment="FL-01"'), count > 0);
+  }
+  app.run(`updateData('option_tanks', ['中継槽', '監視槽', '汚泥貯槽'])`);
+  for (const name of ['relay', 'monitor', 'sludge']) {
+    assert.equal(app.elements.get('fn-' + name).style.display, '');
+    assert.equal(app.elements.get('fa-' + name).style.display, '');
+  }
+  const restored = loadWizard(app.storage);
+  restored.run('resumeDraft()');
+  assert.equal(restored.elements.get('fn-relay').style.display, '');
+  assert.equal(restored.elements.get('fn-filter').style.display, 'none');
+  restored.run(`updateData('option_tanks', [])`);
+  for (const name of ['relay', 'monitor', 'sludge']) assert.equal(restored.elements.get('fn-' + name).style.display, 'none');
+});
+
+test('new-project and reset actions clear conditional details and the previous discharge label', () => {
+  for (const action of ['startNewDraft(true)', 'executeReset()']) {
+    const app = loadWizard();
+    app.run(`data.option_dehydrator = '必要'; toggleDehydratorDetail(true); updateData('discharge_dest', '公共下水道')`);
+    assert.equal(app.elements.get('dehydrator-detail').style.display, 'block');
+    assert.equal(app.run(`document.querySelector('#fn-discharge .node-label').textContent`), '公共下水道へ');
+    app.run(action);
+    assert.equal(app.elements.get('dehydrator-detail').style.display, 'none');
+    assert.equal(app.run(`document.querySelector('#fn-discharge .node-label').textContent`), '直接放流');
+    assert.equal(app.run('data.option_dehydrator'), '');
+    assert.equal(app.run('data.discharge_dest'), '');
+  }
+});
+
+test('switching drafts restores conditional details instead of leaking the previous draft UI', () => {
+  const storage = new Map([['ww-drafts-v2', JSON.stringify([
+    { id: 'a', savedAt: Date.now(), step: 3, data: { option_dehydrator: '必要', dehydrator_maker: 'メーカーA', discharge_dest: '河川・湖沼' } },
+    { id: 'b', savedAt: Date.now(), step: 3, data: { option_dehydrator: '不要' } }
+  ])]]);
+  const app = loadWizard(storage);
+  app.run(`selectedDraftId = 'a'; resumeDraft()`);
+  assert.equal(app.elements.get('dehydrator-detail').style.display, 'block');
+  assert.equal(app.elements.get('dehydrator_maker').value, 'メーカーA');
+  app.run(`selectedDraftId = 'b'; resumeDraft()`);
+  assert.equal(app.elements.get('dehydrator-detail').style.display, 'none');
+  assert.equal(app.elements.get('dehydrator_maker').value, '');
+  assert.equal(app.run(`document.querySelector('#fn-discharge .node-label').textContent`), '直接放流');
 });

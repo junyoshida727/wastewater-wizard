@@ -9,11 +9,7 @@
   function build(d, options = {}) {
     const prefix = String(options.idPrefix || 'ww-flow').replace(/[^a-zA-Z0-9_-]/g, '-') || 'ww-flow';
     const selected = (field, name) => list(d[field]).includes(name);
-    const hasRelay = selected('option_tanks', '中継槽');
-    const hasMonitor = selected('option_tanks', '監視槽');
-    const hasSludge = selected('option_tanks', '汚泥貯槽');
-    const basketCount = new Map([['分岐なし', 1], ['2分岐', 2], ['3分岐', 3], ['4分岐', 4], ['5分岐', 5]]).get(d.filter_branches) || 0;
-    const filterConfigured = basketCount > 0;
+    const { hasRelay, hasMonitor, hasSludge, basketCount, filterConfigured } = root.WizardCore.getProcessConfig(d);
     const powder = d.powder_feeder === '使用する';
     const chemicals = list(d.chemicals).filter(name => !(powder && name === '液体凝集剤'));
     const otherCount = d.chem_other_selected ? Number(d.chem_other_count) : 0;
@@ -59,7 +55,7 @@
     const lowerY = Math.max(Math.max(raw.y + raw.h, coag.y + coag.h, hasRelay ? relay.y + relay.h : 0, hasMonitor ? monitor.y + monitor.h : 0) + 115, coagCaptionY + (mixers('汚泥貯槽').length ? 125 : 95));
     const sludge = { id: 'TK-04', name: '汚泥貯槽', x: coag.x - 220, w: vesselWidth('汚泥貯槽'), y: lowerY, h: Math.max(120, 90 + located('汚泥貯槽').length * 60), extraY: 90 };
     const basketAreaWidth = 30 + basketCount * 90;
-    const filter = { id: 'FL-01', name: 'ろ過装置', x: Math.max(coag.x + 110, hasSludge ? sludge.x + sludge.w + 190 : 0), w: basketAreaWidth + mixers('ろ過受け槽').length * 60, y: lowerY, h: 220 + located('ろ過受け槽').length * 60, extraY: 220 };
+    const filter = { id: 'FL-01', name: 'ろ過装置', x: Math.max(coag.x + 110, hasSludge ? sludge.x + sludge.w + 190 : 0), w: basketAreaWidth + mixers('ろ過受け槽').length * 60, y: lowerY, h: 250 + located('ろ過受け槽').length * 60, extraY: 250 };
     const tanks = [raw, coag, ...(hasRelay ? [relay] : []), ...(hasMonitor ? [monitor] : []), ...(hasSludge ? [sludge] : []), ...(filterConfigured ? [{...filter, name: 'ろ過受け槽'}] : [])];
     // One registry supplies both drawing tags and schedule rows. Standard probes keep number 1.
     const probeTypes = [
@@ -104,6 +100,8 @@
       ...(filterConfigured ? [[filter.id, filter.name, `${d.filter_branches} / カゴ${basketCount}個 / 共通のろ過受け槽`]] : []),
       ...valves.map(valve => [valve.tag, '電磁バルブ', valve.detail]),
       ...probes.map(probe => [probe.tag, probe.name, probe.detail]),
+      ...list(d.level_sensors).filter(name => !tanks.some(tank => tank.name === name))
+        .map(name => ['-', 'レベルセンサー（構成外）', `${name} / 1台 / 設置先要確認・図示なし`]),
       ...(d.sensor_other_selected ? [['-', 'レベルセンサー（その他）', `${d.sensor_other_note || '設置先未入力'} / ${d.sensor_other_count || '?'}台 / 位置未確定・図示なし`]] : []),
       ...feeds.flatMap(feed => feed.type === 'powder' ? [[feed.tag, feed.name, '使用する / 仕様未確定']] : [
         [feed.tag, feed.name, feed.detail], [feed.pump, '薬注ポンプ', `${feed.tag}用 / ${feed.amount}`]

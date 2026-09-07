@@ -1153,7 +1153,7 @@
       padding: 10px !important;
       margin-bottom: 8px !important;
       break-inside: avoid;
-      overflow: hidden !important;
+      overflow: visible !important;
     }
     .flow-result-title { font-size: 8pt !important; margin-bottom: 8px !important; color: #333 !important; }
 
@@ -1167,6 +1167,9 @@
       width: 100% !important;
       min-width: 0 !important;
       height: auto !important;
+      /* A4の印刷可能高277mmから、枠・見出し・余白を差し引く。
+         SVGの既定preserveAspectRatioにより縦横の両方へ収める。 */
+      max-height: 240mm !important;
     }
 
     .fh-node {
@@ -1943,6 +1946,8 @@
     <div class="flow-chart" id="flow-preview">
       <div class="flow-node active-node" id="fn-raw">原水槽<div class="node-label">入力待ち</div></div>
       <div class="flow-arrow active-arrow" id="fa1"></div>
+      <div class="flow-node" id="fn-relay" style="display:none;">中継槽<div class="node-label">ポンプアップで凝集沈殿槽へ</div></div>
+      <div class="flow-arrow" id="fa-relay" style="display:none;"></div>
       <div class="flow-node" id="fn-cyanide" style="display:none;">シアン酸化槽<div class="node-label">CN処理（前処理）</div></div>
       <div class="flow-arrow" id="fa-cyanide" style="display:none;"></div>
       <div class="flow-node" id="fn-chromium" style="display:none;">六価Cr還元槽<div class="node-label">Cr⁶⁺→Cr³⁺（前処理）</div></div>
@@ -1953,16 +1958,21 @@
         <!-- 左：上澄み直接放流 -->
         <div style="display:flex; flex-direction:column; align-items:center;">
           <div class="flow-arrow active-arrow"></div>
+          <div class="flow-node" id="fn-monitor" style="display:none;">監視槽</div>
+          <div class="flow-arrow" id="fa-monitor" style="display:none;"></div>
           <div class="flow-node active-node" id="fn-discharge" style="font-size:11px; min-width:100px;">上澄み液<div class="node-label">直接放流</div></div>
         </div>
         <!-- 右：ろ過スタンド経由 -->
         <div style="display:flex; flex-direction:column; align-items:center;">
           <div class="flow-arrow active-arrow"></div>
+          <div class="flow-node" id="fn-sludge" style="display:none;">汚泥貯槽</div>
+          <div class="flow-arrow" id="fa-sludge" style="display:none;"></div>
           <div class="flow-node" id="fn-fluorine" style="display:none;">フッ素処理槽<div class="node-label">Ca添加・沈殿</div></div>
           <div class="flow-arrow" id="fa-fluorine" style="display:none;"></div>
-          <div class="flow-node active-node" id="fn-filter" style="min-width:100px;">ろ過スタンド<div class="node-label">スラッジ→ろ過</div></div>
-          <div class="flow-arrow active-arrow"></div>
-          <div class="flow-node active-node" style="font-size:11px; min-width:100px;">ろ過水<div class="node-label">放流</div></div>
+          <div class="flow-node" id="fn-filter" style="min-width:100px;">ろ過スタンド<div class="node-label" id="preview-filter-detail"></div></div>
+          <div class="flow-arrow" id="fa-filtrate"></div>
+          <div class="flow-node" id="fn-filtrate" style="font-size:11px; min-width:100px;">ろ過水<div class="node-label">放流</div></div>
+          <div class="flow-node" id="fn-sludge-unconfirmed" style="font-size:11px; min-width:100px;">汚泥処理方法を確認</div>
         </div>
       </div>
     </div>
@@ -2472,6 +2482,16 @@ function goStep(n) {
 
 // ===== Flow Preview Logic =====
 function updateFlowPreview() {
+  const config = WizardCore.getProcessConfig(data);
+  for (const [name, visible] of [['relay', config.hasRelay], ['monitor', config.hasMonitor], ['sludge', config.hasSludge]]) {
+    setNode('fn-' + name, visible, false);
+    setArrow('fa-' + name, visible);
+  }
+  setNode('fn-filter', config.filterConfigured, false);
+  setArrow('fa-filtrate', config.filterConfigured);
+  setNode('fn-filtrate', config.filterConfigured, false);
+  setNode('fn-sludge-unconfirmed', !config.filterConfigured, true);
+  document.getElementById('preview-filter-detail').textContent = config.filterConfigured ? `${data.filter_branches} / カゴ${config.basketCount}個` : '';
   const hazardous = data.hazardous || [];
   const hasCyanide = hazardous.includes('シアン(CN)');
   const hasChromium6 = hazardous.includes('六価クロム(Cr6+)');
@@ -2489,8 +2509,8 @@ function updateFlowPreview() {
 
   // 放流先ラベル更新
   const dischargeLabel = document.querySelector('#fn-discharge .node-label');
-  if (data.discharge_dest && dischargeLabel) {
-    dischargeLabel.textContent = data.discharge_dest + 'へ';
+  if (dischargeLabel) {
+    dischargeLabel.textContent = data.discharge_dest ? data.discharge_dest + 'へ' : '直接放流';
   }
 }
 
@@ -2511,6 +2531,7 @@ function setArrow(id, show) {
 
 // ===== Summary =====
 function updateSummary() {
+  updateFlowPreview();
   renderBatchCapacity();
   const rows = [
     ['業種', data.industry ? getIndustryLabel(data.industry) : ''],
@@ -3048,6 +3069,7 @@ function resetFormUI() {
   document.getElementById('pump-calc-result').style.display = 'none';
   document.getElementById('sensor-other-wrap').style.display = 'none';
   document.getElementById('sensor-count-result').style.display = 'none';
+  document.getElementById('dehydrator-detail').style.display = 'none';
 
   document.getElementById('wastewater_type_select').innerHTML =
     '<option value="">業種を選択すると候補が表示されます</option>';

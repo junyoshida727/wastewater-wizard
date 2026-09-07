@@ -227,3 +227,19 @@ test('capacity conditions survive draft serialization and calculations do not mu
   assert.equal(JSON.stringify(data), before);
   assert.deepEqual(plain(core.normalizeData(JSON.parse(before))), plain(data));
 });
+
+test('sensor placement warnings follow removed vessels and disabled filtration without deleting input', () => {
+  const data = core.normalizeData({ option_tanks: ['中継槽', '監視槽', '汚泥貯槽'], filter_branches: '2分岐', level_sensors: ['原水槽', '中継槽', '監視槽', '汚泥貯槽', 'ろ過受け槽'] });
+  assert.equal(core.validateData(data).warnings.some(w => w.includes('レベルセンサー')), false);
+  data.option_tanks = [];
+  data.filter_branches = 'ろ過しない';
+  const before = JSON.stringify(data);
+  const warnings = core.validateData(data).warnings;
+  const sensorWarning = warnings.find(w => w.includes('レベルセンサー'));
+  for (const name of ['中継槽', '監視槽', '汚泥貯槽', 'ろ過受け槽']) assert.ok(sensorWarning.includes(name));
+  assert.ok(!sensorWarning.includes('原水槽'));
+  assert.equal(JSON.stringify(data), before);
+  data.option_tanks = ['中継槽', '監視槽', '汚泥貯槽'];
+  data.filter_branches = '3分岐';
+  assert.equal(core.validateData(data).warnings.some(w => w.includes('レベルセンサー')), false);
+});

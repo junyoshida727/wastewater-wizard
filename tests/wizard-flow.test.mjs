@@ -404,3 +404,23 @@ test('large chemical lists and long specifications expand the sheet instead of c
   assert.equal(edges(svg).filter(e => e.id.startsWith('feed-')).length, 10);
   for (const [, y] of svg.matchAll(/<text[^>]* y="([\d.]+)"/g)) assert.ok(Number(y) < Number(height) - 24);
 });
+
+test('absent sensor locations remain in the schedule with an explicit warning, without phantom probes', () => {
+  const svg = build({ filter_branches: 'ろ過しない', level_sensors: ['中継槽', 'ろ過受け槽'] });
+  const text = svg.replace(/<[^>]+>/g, '');
+  assert.match(text, /レベルセンサー（構成外）中継槽 \/ 1台 \/ 設置先要確認・図示なし/);
+  assert.match(text, /レベルセンサー（構成外）ろ過受け槽 \/ 1台 \/ 設置先要確認・図示なし/);
+  assert.equal([...svg.matchAll(/data-instrument="LS"/g)].length, 1);
+});
+
+test('the first receiver pump label leaves a full line of clearance below the basket caption', () => {
+  for (const filter_branches of ['分岐なし', '2分岐', '5分岐']) {
+    const svg = build({ filter_branches, extra_pumps: [{ kind: 'ポンプ', tank: 'ろ過受け槽', count: '1' }] });
+    const labelY = Number(svg.match(/<text[^>]* y="([\d.]+)"[^>]*>カゴ1<\/text>/)[1]);
+    const pump = svg.match(/data-equipment="AP-01"[^>]*>([\s\S]*?)<\/g>/)[1];
+    const numberY = Number(pump.match(/<text[^>]* y="([\d.]+)"[^>]*>AP-01<\/text>/)[1]);
+    const circleY = Number(pump.match(/<circle[^>]* cy="([\d.]+)"/)[1]);
+    assert.ok(numberY - 12 >= labelY + 12, 'text bounding areas plus a line of clearance');
+    assert.ok(circleY - 15 >= labelY + 12, 'pump circle also clears the basket caption');
+  }
+});

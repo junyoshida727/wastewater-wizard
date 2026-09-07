@@ -44,10 +44,17 @@
   const EQUIPMENT_KINDS = ['ポンプ', '攪拌機', 'その他'];
   const EQUIPMENT_TANKS = ['原水槽', '凝集沈殿槽', '中継槽', '汚泥貯槽', '監視槽', 'ろ過受け槽'];
 
+  function getProcessConfig(data) {
+    const tanks = asArray(data.option_tanks);
+    const basketCount = new Map([['分岐なし', 1], ['2分岐', 2], ['3分岐', 3], ['4分岐', 4], ['5分岐', 5]]).get(data.filter_branches) || 0;
+    return { hasRelay: tanks.includes('中継槽'), hasMonitor: tanks.includes('監視槽'),
+      hasSludge: tanks.includes('汚泥貯槽'), basketCount, filterConfigured: basketCount > 0 };
+  }
+
   function getEquipmentTanks(data) {
     return EQUIPMENT_TANKS.filter(tank => {
       if (tank === '原水槽' || tank === '凝集沈殿槽') return true;
-      if (tank === 'ろ過受け槽') return Boolean(data.filter_branches) && !['不明', 'ろ過しない'].includes(data.filter_branches);
+      if (tank === 'ろ過受け槽') return getProcessConfig(data).filterConfigured;
       return asArray(data.option_tanks).includes(tank);
     });
   }
@@ -221,6 +228,8 @@
       const invalid = asArray(data[field]).filter((tank) => !asArray(data.option_tanks).includes(tank));
       if (invalid.length) warnings.push(`${label}の設置槽（${invalid.join('、')}）がオプション槽に含まれていません。内容を確認してください。`);
     });
+    const absentSensors = asArray(data.level_sensors).filter(tank => !getEquipmentTanks(data).includes(tank));
+    if (absentSensors.length) warnings.push(`レベルセンサーの設置槽（${absentSensors.join('、')}）が現在の構成にありません。設置先を確認してください。`);
     if (data.chem_other_selected && getOtherChemicalKeys(data).length === 0) {
       errors.push('その他の薬品を選択した場合は、薬注ポンプ台数を選択してください。');
     }
@@ -262,6 +271,7 @@
     EQUIPMENT_KINDS,
     EQUIPMENT_TANKS,
     getEquipmentTanks,
+    getProcessConfig,
     createInitialData,
     normalizeData,
     getOtherChemicalKeys,

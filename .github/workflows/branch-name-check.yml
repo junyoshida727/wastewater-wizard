@@ -10,8 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check branch naming convention
+        env:
+          BRANCH: ${{ github.head_ref }}
         run: |
-          BRANCH="${{ github.head_ref }}"
           echo "Branch: $BRANCH"
           if [[ "$BRANCH" =~ ^(feature|fix)/.+ ]]; then
             echo "OK: Branch name follows convention (feature/xxx or fix/xxx)"
