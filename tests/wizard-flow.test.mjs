@@ -36,6 +36,62 @@ test('standard transfer pump lifts raw water while upper supernatant and lower s
   assert.match(svg, /標準付属/);
 });
 
+test('outlet and branch solenoid valves are inline circle-V symbols with matching schedule tags', () => {
+  for (const [filter_branches, total] of [['2分岐', 4], ['3分岐', 5], ['4分岐', 6], ['5分岐', 7], ['分岐なし', 2], ['ろ過しない', 2], ['不明', 2], ['', 2]]) {
+    for (const option_tanks of [[], ['監視槽', '汚泥貯槽']]) {
+      const svg = build({ filter_branches, option_tanks });
+      const valves = [...svg.matchAll(/<g data-equipment="(MV-\d+)" data-kind="solenoid-valve" data-on-pipe="([^"]+)">([\s\S]*?)<\/g>/g)];
+      assert.equal(valves.length, total);
+      assert.equal(valves[0][2], option_tanks.length ? 'supernatant-monitor' : 'supernatant-discharge');
+      assert.equal(valves[1][2], option_tanks.length ? 'sludge-storage' : ['', '不明', 'ろ過しない'].includes(filter_branches) ? 'sludge-unconfirmed' : 'sludge-filter');
+      for (const [i, [, tag, routeId, body]] of valves.entries()) {
+        assert.equal(tag, `MV-${i + 1}`);
+        if (i > 1) assert.equal(routeId, `filter-branch-${i - 1}`);
+        assert.match(body, />V<\/text>/);
+        const [, x, y] = body.match(/<circle cx="([\d.]+)" cy="([\d.]+)"/).map(Number);
+        const path = svg.match(new RegExp(`data-pipe="${routeId}"[^>]* d="([^"]+)"`))[1];
+        const points = [...path.matchAll(/[ML]([\d.]+),([\d.]+)/g)].map(m => m.slice(1).map(Number));
+        assert.ok(points.slice(1).some(([x2, y2], n) => {
+          const [x1, y1] = points[n];
+          return x1 === x2 && x === x1 && y > Math.min(y1, y2) && y < Math.max(y1, y2)
+            || y1 === y2 && y === y1 && x > Math.min(x1, x2) && x < Math.max(x1, x2);
+        }), `${tag} lies within its pipe segment`);
+        assert.equal([...svg.matchAll(new RegExp(`>${tag}</text>`, 'g'))].length, 2, 'tag appears on drawing and schedule');
+      }
+    }
+  }
+});
+
+test('instrument registry numbers each drawn probe and includes its name and tank in the schedule', () => {
+  const svg = build({ option_tanks: ['中継槽', '監視槽', '汚泥貯槽'], filter_branches: '5分岐',
+    option_ph_tanks: ['中継槽', '監視槽', '汚泥貯槽'], option_turbidity_tanks: ['中継槽', '監視槽', '汚泥貯槽'],
+    level_sensors: ['原水槽', '中継槽', '監視槽', '汚泥貯槽', 'ろ過受け槽'] });
+  for (const [label, prefix, count, name] of [['pH', 'PH', 4, 'pH計'], ['TU', 'TU', 3, '濁度計'], ['LS', 'LS', 6, 'レベルセンサー']]) {
+    const probes = [...svg.matchAll(new RegExp(`data-instrument="${label}" data-equipment="(${prefix}-\\d+)" data-tank="([^"]+)"`, 'g'))];
+    assert.equal(probes.length, count);
+    assert.equal(new Set(probes.map(p => p[1])).size, count);
+    for (let i = 1; i <= count; i++) {
+      const tag = `${prefix}-${i}`;
+      assert.equal([...svg.matchAll(new RegExp(`>${tag}</text>`, 'g'))].length, 2);
+      assert.match(svg, new RegExp(`>${tag}</text><text[^>]+>${name}</text><text[^>]+>[^<]+ / 1台`));
+    }
+  }
+  assert.match(svg, /data-equipment="PH-1" data-tank="TK-02"/);
+  assert.match(svg, /data-equipment="LS-1" data-tank="TK-02"/);
+  assert.match(svg, /data-equipment="LS-6" data-tank="FL-01"/);
+  const absent = build({ option_ph_tanks: ['中継槽'], option_turbidity_tanks: ['監視槽'], level_sensors: ['ろ過受け槽'] });
+  assert.doesNotMatch(absent, /data-equipment="(?:PH-2|TU-1|LS-2)"/);
+  assert.doesNotMatch(absent, />PH-2<|>TU-1<|>LS-2</);
+});
+
+test('unlocated custom level sensors retain their count and escaped location in the schedule only', () => {
+  const svg = build({ sensor_other_selected: true, sensor_other_count: '2', sensor_other_note: '<外部&槽>' });
+  assert.match(svg.replace(/<[^>]+>/g, ''), /レベルセンサー（その他）/);
+  assert.match(svg, /&lt;外部&amp;槽&gt; \/ 2台/);
+  assert.match(svg.replace(/<[^>]+>/g, ''), /位置未確定・図示なし/);
+  assert.equal([...svg.matchAll(/data-instrument="LS"/g)].length, 1);
+});
+
 test('transfer discharge rises through the source open top before travelling outside the vessel', () => {
   for (const option_tanks of [[], ['中継槽']]) {
     const svg = build({ option_tanks });
@@ -83,7 +139,7 @@ test('selected relay, monitor and sludge tanks have distinct symbols and connect
 
 test('instrument stems are solid while chemical dosing lines retain their own line type', () => {
   const svg = build({ option_tanks: ['監視槽'], option_ph_tanks: ['監視槽'], option_turbidity_tanks: ['監視槽'], level_sensors: ['ろ過受け槽'], filter_branches: '2分岐', chemicals: ['酸'] });
-  const instruments = [...svg.matchAll(/<g data-instrument="[^"]+">([\s\S]*?)<\/g>/g)];
+  const instruments = [...svg.matchAll(/<g data-instrument="[^"]+"[^>]*>([\s\S]*?)<\/g>/g)];
   assert.ok(instruments.length >= 5);
   for (const [, body] of instruments) assert.doesNotMatch(body, /stroke-dasharray/);
   assert.match(svg, /data-kind="chemical"[^>]*stroke-dasharray/);
@@ -124,7 +180,7 @@ test('additional mixers have motors above the vessel, shafts crossing the water 
 test('multiple mixers occupy separate lanes without colliding with instrument circles', () => {
   const svg = build({ option_tanks: ['中継槽'], option_ph_tanks: ['中継槽'], option_turbidity_tanks: ['中継槽'], level_sensors: ['原水槽', '中継槽'], extra_pumps: ['原水槽', '原水槽', '中継槽', '中継槽'].map(tank => ({ kind: '攪拌機', tank, count: '1' })) });
   const motors = [...svg.matchAll(/data-part="motor" cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)].map(m => m.slice(1).map(Number));
-  const meters = [...svg.matchAll(/data-instrument="[^"]+"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)].map(m => m.slice(1).map(Number));
+  const meters = [...svg.matchAll(/data-instrument="[^"]+"[^>]*><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)].map(m => m.slice(1).map(Number));
   assert.equal(motors.length, 5, 'four additional motors and the standard reactor motor');
   const circles = [...motors, ...meters];
   for (let i = 0; i < circles.length; i++) for (let j = i + 1; j < circles.length; j++) {

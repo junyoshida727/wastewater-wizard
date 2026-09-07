@@ -49,6 +49,26 @@
     const basketAreaWidth = 30 + basketCount * 90;
     const filter = { id: 'FL-01', name: 'ろ過装置', x: Math.max(coag.x + 110, hasSludge ? sludge.x + sludge.w + 190 : 0), w: basketAreaWidth + mixers('ろ過受け槽').length * 60, y: lowerY, h: 220 + located('ろ過受け槽').length * 60, extraY: 220 };
     const tanks = [raw, coag, ...(hasRelay ? [relay] : []), ...(hasMonitor ? [monitor] : []), ...(hasSludge ? [sludge] : []), ...(filterConfigured ? [{...filter, name: 'ろ過受け槽'}] : [])];
+    // One registry supplies both drawing tags and schedule rows. Standard probes keep number 1.
+    const probeTypes = [
+      { label: 'pH', prefix: 'PH', name: 'pH計', field: 'option_ph_tanks' },
+      { label: 'TU', prefix: 'TU', name: '濁度計', field: 'option_turbidity_tanks' },
+      { label: 'LS', prefix: 'LS', name: 'レベルセンサー', field: 'level_sensors' }
+    ];
+    const probes = probeTypes.flatMap(type => [coag, ...tanks.filter(tank => tank !== coag)]
+      .filter(tank => (tank === coag && type.label !== 'TU') || selected(type.field, tank.name))
+      .map((tank, i) => ({ ...type, tag: `${type.prefix}-${i + 1}`, tank,
+        detail: `${tank.name} / 1台${tank === coag && type.label !== 'TU' ? ' / 標準付属' : ''}` })));
+    const sludgePipe = hasSludge ? 'sludge-storage' : filterConfigured ? 'sludge-filter' : 'sludge-unconfirmed';
+    const valves = [
+      { tag: 'MV-1', pipe: hasMonitor ? 'supernatant-monitor' : 'supernatant-discharge', detail: '凝集沈殿槽 / 上澄液出口 / 1個', x: coag.x + coag.w + 55, y: 550, horizontal: true },
+      { tag: 'MV-2', pipe: sludgePipe, detail: '凝集沈殿槽 / 汚泥出口 / 1個', x: coag.x + coag.w / 2, y: coag.y + coag.h + 28 },
+      // With no split, only the tank outlet valve is needed; each split gets its own valve.
+      ...Array.from({ length: basketCount > 1 ? basketCount : 0 }, (_, i) => ({
+        tag: `MV-${i + 3}`, pipe: `filter-branch-${i + 1}`, detail: `ろ過分岐${i + 1} / カゴ${i + 1}手前 / 1個`,
+        x: filter.x + 60 + i * 90, y: filter.y + 44
+      }))
+    ];
     const placement = item => {
       if (String(item.count ?? '').trim() !== '' && Number(item.count) === 0) return '図示なし';
       if (!['ポンプ', '攪拌機', 'その他'].includes(item.kind)) return '種別未指定 / 設置槽：' + (item.tank || '未指定');
@@ -70,6 +90,9 @@
       ...(hasSludge ? [[sludge.id, sludge.name, '選択あり / 容量未確定']] : []),
       ...(hasMonitor ? [[monitor.id, monitor.name, '選択あり / 容量未確定']] : []),
       ...(filterConfigured ? [[filter.id, filter.name, `${d.filter_branches} / カゴ${basketCount}個 / 共通のろ過受け槽`]] : []),
+      ...valves.map(valve => [valve.tag, '電磁バルブ', valve.detail]),
+      ...probes.map(probe => [probe.tag, probe.name, probe.detail]),
+      ...(d.sensor_other_selected ? [['-', 'レベルセンサー（その他）', `${d.sensor_other_note || '設置先未入力'} / ${d.sensor_other_count || '?'}台 / 位置未確定・図示なし`]] : []),
       ...feeds.flatMap(feed => feed.type === 'powder' ? [[feed.tag, feed.name, '使用する / 仕様未確定']] : [
         [feed.tag, feed.name, feed.detail], [feed.pump, '薬注ポンプ', `${feed.tag}用 / ${feed.amount}`]
       ]),
@@ -118,17 +141,15 @@
       line(tank.x + 5, tank.y + tank.h + 31, tank.x + tank.w - 5, tank.y + tank.h + 31);
       text(tank.x + tank.w / 2, tank.y + tank.h + 50, detail, 12, 'middle');
     };
-    const instrument = (cx, cy, label, targetY, targetX = cx, bendY = cy + 26) => {
-      pieces.push(`<g data-instrument="${esc(label)}"><circle cx="${cx}" cy="${cy}" r="18" fill="white"/><text x="${cx}" y="${cy + 5}" fill="#20252b" stroke="none" font-size="13" text-anchor="middle">${esc(label)}</text><path d="M${cx},${cy + 18} V${bendY} H${targetX} V${targetY}" fill="none"/></g>`);
+    const instrument = (cx, cy, probe, targetY, targetX = cx, bendY = cy + 26) => {
+      pieces.push(`<g data-instrument="${probe.label}" data-equipment="${probe.tag}" data-tank="${probe.tank.id}"><circle cx="${cx}" cy="${cy}" r="18" fill="white"/><text x="${cx}" y="${cy + 5}" fill="#20252b" stroke="none" font-size="13" text-anchor="middle">${probe.label}</text><path d="M${cx},${cy + 18} V${bendY} H${targetX} V${targetY}" fill="none"/>`);
+      text(cx, cy - 27, probe.tag, 12, 'middle');
+      pieces.push('</g>');
     };
     const instruments = tank => {
-      const labels = [];
-      if (tank === coag || selected('option_ph_tanks', tank.name)) labels.push('pH');
-      if (selected('option_turbidity_tanks', tank.name)) labels.push('TU');
-      if (tank === coag || selected('level_sensors', tank.name)) labels.push('LS');
-      labels.forEach((label, i) => tank === coag
-        ? instrument(tank.x + tank.w + 35 + i * 45, tank.y - 40, label, tank.y + 40, tank.x + tank.w - 16 - i * 14, tank.y - 14 + i * 8)
-        : instrument(tank.x + tank.w - 20 - i * 45, tank.y - 46, label, tank.y + 40));
+      probes.filter(probe => probe.tank.id === tank.id).forEach((probe, i) => tank === coag
+        ? instrument(tank.x + tank.w + 35 + i * 45, tank.y - 40, probe, tank.y + 40, tank.x + tank.w - 16 - i * 14, tank.y - 14 + i * 8)
+        : instrument(tank.x + tank.w - 20 - i * 45, tank.y - 46, probe, tank.y + 40));
     };
     const pumpSymbol = (cx, cy, radius = 15) => {
       pieces.push(`<circle cx="${cx}" cy="${cy}" r="${radius}" fill="white"/>`);
@@ -208,7 +229,7 @@
     text(375, 137, '薬品投入（各別配管）', 12);
     line(580, 132, 630, 132, `stroke-width="1.5" marker-end="url(#${prefix}-arrow)"`);
     text(640, 137, '粉体投入', 12);
-    text(54, 160, 'P：ポンプ  /  M：撹拌機  /  pH：pH計  /  TU：濁度計  /  LS：液位検出', 12);
+    text(54, 160, 'P：ポンプ  /  M：撹拌機  /  V：電磁バルブ（MV）  /  pH：pH計（PH）  /  TU：濁度計  /  LS：液位検出', 12);
     text(54, 179, '破線の槽：有無・設置を要確認。線の交差部は接続なし。', 12);
 
     // Each dosing source has its own line and its own vessel entry point.
@@ -270,7 +291,7 @@
       pieces.push(`<g data-equipment="${filter.id}">`);
       pieces.push(`<path d="M${filter.x},${filter.y + 90} V${filter.y + filter.h} H${filter.x + filter.w} V${filter.y + 90}" data-part="filter-receiver" stroke-width="1.8"/>`);
       // A common header feeds one basket per selected branch, all within one receiver.
-      // Basket spacing is schematic; valve types and actual dimensions remain unspecified.
+      // Basket spacing is schematic; valve specifications and actual dimensions remain unspecified.
       line(filter.x + 60, filter.y, filter.x + 60 + (basketCount - 1) * 90, filter.y, 'data-part="filter-header" stroke-width="2.4"');
       for (let i = 0; i < basketCount; i++) {
         const cx = filter.x + 60 + i * 90, top = filter.y + 108, bottom = top + 80;
@@ -285,7 +306,8 @@
         pieces.push(`<circle cx="${cx}" cy="${filter.y}" r="3" fill="#20252b" stroke="none"/>`);
       }
       pieces.push('</g>');
-      if (selected('level_sensors', 'ろ過受け槽')) instrument(filter.x - 30, filter.y + 50, 'LS', filter.y + filter.h - 8, filter.x + 6);
+      probes.filter(probe => probe.tank.id === filter.id).forEach((probe, i) =>
+        instrument(filter.x - 30 - i * 45, filter.y + 50, probe, filter.y + filter.h - 8, filter.x + 6 + i * 12));
       additionalEquipment({...filter, name: 'ろ過受け槽'});
       caption(filter, `${d.filter_branches} / カゴ${basketCount}個 / ろ過受け槽`);
       pipe('filtrate-discharge', filter.id, 'ろ過水放流', [[filter.x + filter.w, filter.y + filter.h - 12], [drawingRight - 25, filter.y + filter.h - 12]]);
@@ -300,6 +322,13 @@
     if (hasSludge && !filterConfigured) {
       text(sludge.x + sludge.w / 2, sludge.y + sludge.h + 70, '後段の汚泥処理方法を確認', 12, 'middle');
     }
+    // Overlay after pipes so each inline valve stays visible at its actual outlet/branch.
+    valves.forEach(valve => {
+      pieces.push(`<g data-equipment="${valve.tag}" data-kind="solenoid-valve" data-on-pipe="${valve.pipe}"><circle cx="${valve.x}" cy="${valve.y}" r="14" fill="white"/>`);
+      text(valve.x, valve.y + 5, 'V', 16, 'middle');
+      text(valve.x + (valve.horizontal ? 0 : 22), valve.y + (valve.horizontal ? 34 : 4), valve.tag, 12, valve.horizontal ? 'middle' : 'start');
+      pieces.push('</g>');
+    });
 
     // Equipment schedule and title block use growing rows, never clipped labels.
     rect(tableX, 100, 380, tableBottom - 100);
@@ -313,14 +342,14 @@
       rowY += rowHeights[i];
     });
     line(tableX + 80, 142, tableX + 80, tableBottom);
-    text(tableX, tableBottom + 28, '計器：選択した設置槽に記号を表示', 12);
+    text(tableX, tableBottom + 28, '電磁バルブ・計器：図面と一覧の番号が対応', 12);
     text(tableX, tableBottom + 47, 'pH計・液位検出は凝集沈殿槽に標準表示。', 12);
     text(tableX, tableBottom + 66, '追加機器は槽内に記号・台数で表示。', 12);
 
     line(24, footerY, width - 24, footerY);
     text(48, footerY + 25, '設計確認事項', 14, 'start', 'font-weight="600"');
     text(48, footerY + 48, '1. ヒアリング情報に基づく概略図。製作用・施工用図面ではありません。', 13);
-    text(48, footerY + 70, '2. 配管口径・弁種・材質・制御配線・機器仕様・設置寸法は未確定です。', 13);
+    text(48, footerY + 70, '2. 配管口径・弁の詳細仕様・材質・制御配線・設置寸法は未確定です。', 13);
     text(48, footerY + 92, '3. 追加ポンプの吐出先・脱水機の接続、処理水質・前処理構成は別途確認してください。', 13);
     const titleX = Math.max(tableX - 140, 790);
     line(titleX, footerY, titleX, height - 24);
