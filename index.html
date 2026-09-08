@@ -208,6 +208,28 @@
     white-space: nowrap;
   }
 
+  .capacity-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 28px;
+  }
+  .capacity-section h3 { font-size: 15px; margin-bottom: 10px; }
+  .capacity-help { font-size: 12px; color: var(--text2); line-height: 1.8; margin: 8px 0; overflow-wrap: anywhere; }
+  .capacity-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 18px 0; }
+  .capacity-inputs input { min-width: 0; }
+  .capacity-report { border-top: 1px solid var(--border); padding-top: 12px; }
+  .capacity-status { font-size: 14px; font-weight: 700; line-height: 1.6; }
+  .capacity-report[data-status="sufficient"] .capacity-status { color: var(--accent); }
+  .capacity-report[data-status="insufficient"] .capacity-status,
+  .capacity-report[data-status="at_limit"] .capacity-status,
+  .capacity-report[data-status="invalid"] .capacity-status { color: var(--warn); }
+  .capacity-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin: 12px 0; }
+  .capacity-metrics > div { padding: 8px 0; border-bottom: 1px solid var(--border); min-width: 0; }
+  .capacity-metrics dt { font-size: 12px; color: var(--text2); }
+  .capacity-metrics dd { font-size: 16px; margin-top: 4px; overflow-wrap: anywhere; }
+
   /* Checkbox / Radio Grid */
   .check-grid {
     display: grid;
@@ -530,7 +552,7 @@
     display: none;
     padding: 40px 48px;
     grid-column: 2 / 3;
-    max-width: 900px;
+    max-width: 1600px;
   }
   #result-page.show { display: block; }
 
@@ -551,6 +573,12 @@
     margin-bottom: 24px;
     overflow: visible;
   }
+  .equipment-help { font-size:12px; color:var(--text2); line-height:1.7; margin-bottom:10px; }
+  .flow-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .flow-toolbar .btn { padding: 9px 14px; font-size: 12px; min-height: 44px; }
+  .flow-toolbar [aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+  .flow-toolbar span { font-size: 12px; color: var(--text2); }
+  #result-flow svg { display: block; width: 100%; height: auto; flex-shrink: 0; max-width: none; }
   /* SVGフロー図を格納するdivは横スクロール可能に */
   #result-flow {
     overflow-x: auto;
@@ -893,6 +921,9 @@
   /* スマホ（〜600px）: モバイル最適化レイアウト */
   @media (max-width: 600px) {
 
+    .capacity-inputs, .capacity-metrics { grid-template-columns: 1fr; }
+    .capacity-section { padding: 16px; }
+
     /* === ヘッダー === */
     header { padding: 10px 16px; gap: 8px; flex-wrap: wrap; min-height: 52px; }
     header h1 { font-size: 13px; }
@@ -1069,6 +1100,10 @@
       size: A4 portrait;
       margin: 10mm;
     }
+    @page flow-diagram {
+      size: A4 landscape;
+      margin: 8mm;
+    }
 
     /* 画面UI要素をすべて非表示 */
     body { background: #fff !important; }
@@ -1090,6 +1125,19 @@
       background: #fff !important;
     }
 
+    .capacity-section {
+      background: #f7f7f7 !important;
+      border: 1px solid #ccc !important;
+      padding: 8px !important;
+      margin-bottom: 8px !important;
+      break-inside: avoid;
+    }
+    .capacity-section * { color: #111 !important; }
+    .capacity-section h3, .capacity-status { font-size: 10pt !important; }
+    .capacity-help, .capacity-metrics dt, .capacity-metrics dd { font-size: 8pt !important; }
+    .capacity-metrics { grid-template-columns: 1fr 1fr !important; gap: 0 12px; margin: 6px 0; }
+    .capacity-metrics > div { padding: 4px 0; }
+
     /* ヘッダー */
     .pdf-header {
       display: flex !important;
@@ -1108,8 +1156,11 @@
       border: 1px solid #ccc !important;
       padding: 10px !important;
       margin-bottom: 8px !important;
+      page: flow-diagram;
+      break-before: page;
+      break-after: page;
       break-inside: avoid;
-      overflow: hidden !important;
+      overflow: visible !important;
     }
     .flow-result-title { font-size: 8pt !important; margin-bottom: 8px !important; color: #333 !important; }
 
@@ -1123,6 +1174,9 @@
       width: 100% !important;
       min-width: 0 !important;
       height: auto !important;
+      /* A4横の印刷可能高194mmから、枠・見出し・余白を差し引く。
+         SVGの既定preserveAspectRatioにより縦横の両方へ収める。 */
+      max-height: 175mm !important;
     }
 
     .fh-node {
@@ -1219,6 +1273,7 @@
   .tooltip-wrap:hover .tooltip-text { display: block; }
 </style>
 <script src="wizard-core.js"></script>
+<script src="wizard-flow.js"></script>
 </head>
 <body>
 
@@ -1382,7 +1437,7 @@
           </div>
         </div>
         <div class="input-with-unit">
-          <input type="number" id="daily_volume" placeholder="例: 5" min="0" oninput="updateData('daily_volume', this.value)">
+          <input type="number" id="daily_volume" placeholder="例: 5" min="0" step="any" oninput="updateData('daily_volume', this.value)">
           <span class="unit">m³/日</span>
         </div>
       </div>
@@ -1414,9 +1469,39 @@
         </div>
       </div>
 
+      <section class="capacity-section" aria-labelledby="capacity-heading">
+        <h3 id="capacity-heading">バッチ処理能力の概算チェック</h3>
+        <p class="capacity-help">上の排水量・装置容量と、以下の運転条件から日処理能力を確認します。任意入力です。条件が不明な場合は空欄にしてください。</p>
+        <div class="capacity-inputs">
+          <div>
+            <label class="field-label" for="operating_hours">運転可能時間</label>
+            <div class="input-with-unit">
+              <input type="number" id="operating_hours" min="0" max="24" step="any" placeholder="例: 8" aria-describedby="capacity-conditions-help" oninput="updateData('operating_hours', this.value)">
+              <span class="unit">時間/日</span>
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="batch_cycle_minutes">1バッチの所要時間</label>
+            <div class="input-with-unit">
+              <input type="number" id="batch_cycle_minutes" min="0" step="any" placeholder="例: 90" aria-describedby="capacity-conditions-help" oninput="updateData('batch_cycle_minutes', this.value)">
+              <span class="unit">分/回</span>
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="working_volume_percent">容量の有効使用率</label>
+            <div class="input-with-unit">
+              <input type="number" id="working_volume_percent" min="0" max="100" step="any" placeholder="例: 80" aria-describedby="capacity-conditions-help" oninput="updateData('working_volume_percent', this.value)">
+              <span class="unit">%</span>
+            </div>
+          </div>
+        </div>
+        <p class="capacity-help" id="capacity-conditions-help">運転可能時間は休止・保守時間を除いた時間、所要時間は給水・反応・沈殿・排水・汚泥排出など次のバッチ開始までの全工程を入力。有効使用率は、装置容量のうち1回に受け入れられる原水量の割合です。メーカー仕様・試験結果等をもとに設定してください。入力例は推奨値ではありません。</p>
+        <div id="capacity-preview"></div>
+      </section>
+
       <div class="field-group">
         <div class="field-label">ろ過分岐数</div>
-        <div style="font-size:11px; color:var(--text3); margin-bottom:8px;">複数の排水口から同時ろ過する場合に選択</div>
+        <div style="font-size:11px; color:var(--text3); margin-bottom:8px;">基本構成：200Lは2分岐、500Lは3分岐、1000Lは5分岐。選択した分岐数のカゴを、図面のろ過受け槽内に表示します（分岐なしは1個）。</div>
         <div class="radio-grid" id="filter_branches" style="grid-template-columns:repeat(3,1fr);">
           <div class="radio-item" onclick="selectRadio('filter_branches', '分岐なし', this)">分岐なし</div>
           <div class="radio-item" onclick="selectRadio('filter_branches', '2分岐', this)">2分岐</div>
@@ -1696,11 +1781,13 @@
 
       <div class="field-group">
         <div class="field-label">追加ポンプ・攪拌機（標準付属以外）</div>
-        <div style="font-size:11px; color:var(--text3); margin-bottom:10px;">制御盤と連動が必要な機器を入力してください。既設の攪拌機・ポンプも含みます（原水槽→凝集沈殿槽の移送ポンプ1台は標準付属）</div>
-        <table style="width:100%; border-collapse:collapse; font-size:13px;" id="extra-pump-table">
+        <div style="font-size:11px; color:var(--text3); margin-bottom:10px;">制御盤と連動が必要な機器を入力してください。既設の攪拌機・ポンプも含みます（原水移送ポンプ1台は標準付属。中継槽ありの場合は、原水槽→中継槽と中継槽→凝集沈殿槽の計2台を図示し、中継槽側の1台を追加分とします）</div>
+        <p class="equipment-help">設置槽を選ぶとフロー図の槽内に追加機器を表示します。台数は記号に併記します。追加ポンプの吐出先・配管接続は別途確認してください。図示済みの移送ポンプはここへの重複入力は不要です。</p>
+        <div style="overflow-x:auto;">
+        <table style="width:100%; min-width:540px; border-collapse:collapse; font-size:13px;" id="extra-pump-table">
           <thead>
             <tr style="border-bottom:1px solid var(--border); color:var(--text2);">
-              <th style="text-align:left; padding:6px 4px; font-weight:500;">ポンプ名</th>
+              <th style="text-align:left; padding:6px 4px; font-weight:500;">機器名・種別・設置槽</th>
               <th style="text-align:center; padding:6px 4px; font-weight:500;">台数</th>
               <th style="text-align:center; padding:6px 4px; font-weight:500;">容量(kW)</th>
               <th style="text-align:center; padding:6px 4px; font-weight:500;">定格電流(A)</th>
@@ -1709,11 +1796,12 @@
           </thead>
           <tbody id="extra-pump-rows">
             <tr id="extra-pump-empty" style="color:var(--text3); font-size:12px;">
-              <td colspan="5" style="padding:12px 4px; text-align:center;">「＋ポンプを追加」から入力してください</td>
+              <td colspan="5" style="padding:12px 4px; text-align:center;">「＋機器を追加」から入力してください</td>
             </tr>
           </tbody>
         </table>
-        <button type="button" onclick="addPumpRow()" style="margin-top:10px; padding:6px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:6px; color:var(--accent); font-size:12px; cursor:pointer;">＋ ポンプを追加</button>
+        </div>
+        <button type="button" onclick="addPumpRow()" style="margin-top:10px; padding:6px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:6px; color:var(--accent); font-size:12px; cursor:pointer;">＋ 機器を追加</button>
       </div>
 
       <div class="field-group">
@@ -1865,6 +1953,8 @@
     <div class="flow-chart" id="flow-preview">
       <div class="flow-node active-node" id="fn-raw">原水槽<div class="node-label">入力待ち</div></div>
       <div class="flow-arrow active-arrow" id="fa1"></div>
+      <div class="flow-node" id="fn-relay" style="display:none;">中継槽<div class="node-label">ポンプアップで凝集沈殿槽へ</div></div>
+      <div class="flow-arrow" id="fa-relay" style="display:none;"></div>
       <div class="flow-node" id="fn-cyanide" style="display:none;">シアン酸化槽<div class="node-label">CN処理（前処理）</div></div>
       <div class="flow-arrow" id="fa-cyanide" style="display:none;"></div>
       <div class="flow-node" id="fn-chromium" style="display:none;">六価Cr還元槽<div class="node-label">Cr⁶⁺→Cr³⁺（前処理）</div></div>
@@ -1875,16 +1965,21 @@
         <!-- 左：上澄み直接放流 -->
         <div style="display:flex; flex-direction:column; align-items:center;">
           <div class="flow-arrow active-arrow"></div>
+          <div class="flow-node" id="fn-monitor" style="display:none;">監視槽</div>
+          <div class="flow-arrow" id="fa-monitor" style="display:none;"></div>
           <div class="flow-node active-node" id="fn-discharge" style="font-size:11px; min-width:100px;">上澄み液<div class="node-label">直接放流</div></div>
         </div>
         <!-- 右：ろ過スタンド経由 -->
         <div style="display:flex; flex-direction:column; align-items:center;">
           <div class="flow-arrow active-arrow"></div>
+          <div class="flow-node" id="fn-sludge" style="display:none;">汚泥貯槽</div>
+          <div class="flow-arrow" id="fa-sludge" style="display:none;"></div>
           <div class="flow-node" id="fn-fluorine" style="display:none;">フッ素処理槽<div class="node-label">Ca添加・沈殿</div></div>
           <div class="flow-arrow" id="fa-fluorine" style="display:none;"></div>
-          <div class="flow-node active-node" id="fn-filter" style="min-width:100px;">ろ過スタンド<div class="node-label">スラッジ→ろ過</div></div>
-          <div class="flow-arrow active-arrow"></div>
-          <div class="flow-node active-node" style="font-size:11px; min-width:100px;">ろ過水<div class="node-label">放流</div></div>
+          <div class="flow-node" id="fn-filter" style="min-width:100px;">ろ過スタンド<div class="node-label" id="preview-filter-detail"></div></div>
+          <div class="flow-arrow" id="fa-filtrate"></div>
+          <div class="flow-node" id="fn-filtrate" style="font-size:11px; min-width:100px;">ろ過水<div class="node-label">放流</div></div>
+          <div class="flow-node" id="fn-sludge-unconfirmed" style="font-size:11px; min-width:100px;">汚泥処理方法を確認</div>
         </div>
       </div>
     </div>
@@ -1917,7 +2012,13 @@
 
     <!-- フロー図 -->
     <div class="flow-result">
-      <div class="flow-result-title">推奨 処理フロー図</div>
+      <div class="flow-result-title">排水処理設備 概略フロー図</div>
+      <div class="flow-toolbar no-print" role="group" aria-label="フロー図の表示と保存">
+        <button type="button" class="btn btn-secondary" id="flow-fit" aria-pressed="true" onclick="setFlowScale(false)">全体表示</button>
+        <button type="button" class="btn btn-secondary" id="flow-actual" aria-pressed="false" onclick="setFlowScale(true)">100%表示</button>
+        <button type="button" class="btn btn-secondary" onclick="downloadFlowSVG()">SVGを保存</button>
+        <span>詳細は100%表示で確認できます。SVGは拡大しても鮮明です。</span>
+      </div>
       <div class="flow-horizontal" id="result-flow"></div>
     </div>
 
@@ -1925,6 +2026,11 @@
       <div class="flow-result-title">入力漏れチェック</div>
       <div id="result-missing-check"></div>
     </div>
+
+    <section class="capacity-section" aria-labelledby="result-capacity-heading">
+      <h3 id="result-capacity-heading">バッチ処理能力の概算チェック</h3>
+      <div id="result-capacity"></div>
+    </section>
 
     <!-- 入力データ一覧 -->
     <div class="data-table-section">
@@ -2151,6 +2257,7 @@ function _restoreUI(targetStep) {
    'wastewater_type','daily_volume','working_days','raw_tank_size','ph_min','ph_max',
    'space_area','power_cable_length','pipe_distance','pipe_step','notes','sensor_other_note',
    'dehydrator_maker','dehydrator_model','raw_water_temp','sludge_amount',
+   'operating_hours','batch_cycle_minutes','working_volume_percent',
    'step_notes1','step_notes2','step_notes3','step_notes4'
   ].forEach(key => {
     const el = document.getElementById(key);
@@ -2248,22 +2355,13 @@ function _restoreUI(targetStep) {
   savedPumps.forEach(pump => {
     const idx = pumpRowCount++;
     data.extra_pumps.push({ ...pump });
-    const tr = document.createElement('tr');
-    tr.id = 'pump-row-' + idx;
-    tr.style.borderBottom = '1px solid var(--border)';
-    tr.innerHTML = `
-      <td style="padding:4px;"><input type="text" placeholder="例: 移送ポンプ" style="width:100%;" oninput="updateExtraPump(${idx},'name',this.value)" value="${escapeAttr(pump.name)}"></td>
-      <td style="padding:4px;"><input type="number" min="0" placeholder="1" style="width:52px;text-align:center;" oninput="updateExtraPump(${idx},'count',this.value)" value="${escapeAttr(pump.count)}"></td>
-      <td style="padding:4px;"><input type="number" min="0" step="0.1" placeholder="0.1" style="width:72px;text-align:center;" oninput="updateExtraPump(${idx},'lph',this.value)" value="${escapeAttr(pump.lph)}"></td>
-      <td style="padding:4px;"><input type="number" min="0" step="0.1" placeholder="—" style="width:72px;text-align:center;" oninput="updateExtraPump(${idx},'amp',this.value)" value="${escapeAttr(pump.amp)}"></td>
-      <td style="padding:4px;text-align:center;"><button type="button" onclick="removePumpRow(${idx})" style="background:none;border:none;color:var(--warn);cursor:pointer;font-size:16px;">✕</button></td>`;
-    document.getElementById('extra-pump-rows').appendChild(tr);
+    appendPumpRow(idx, pump);
   });
   if (savedPumps.length === 0) {
     const empty = document.createElement('tr');
     empty.id = 'extra-pump-empty';
     empty.style.color = 'var(--text3)'; empty.style.fontSize = '12px';
-    empty.innerHTML = '<td colspan="5" style="padding:12px 4px;text-align:center;">「＋ポンプを追加」から入力してください</td>';
+    empty.innerHTML = '<td colspan="5" style="padding:12px 4px;text-align:center;">「＋機器を追加」から入力してください</td>';
     document.getElementById('extra-pump-rows').appendChild(empty);
   }
 
@@ -2391,6 +2489,16 @@ function goStep(n) {
 
 // ===== Flow Preview Logic =====
 function updateFlowPreview() {
+  const config = WizardCore.getProcessConfig(data);
+  for (const [name, visible] of [['relay', config.hasRelay], ['monitor', config.hasMonitor], ['sludge', config.hasSludge]]) {
+    setNode('fn-' + name, visible, false);
+    setArrow('fa-' + name, visible);
+  }
+  setNode('fn-filter', config.filterConfigured, false);
+  setArrow('fa-filtrate', config.filterConfigured);
+  setNode('fn-filtrate', config.filterConfigured, false);
+  setNode('fn-sludge-unconfirmed', !config.filterConfigured, true);
+  document.getElementById('preview-filter-detail').textContent = config.filterConfigured ? `${data.filter_branches} / カゴ${config.basketCount}個` : '';
   const hazardous = data.hazardous || [];
   const hasCyanide = hazardous.includes('シアン(CN)');
   const hasChromium6 = hazardous.includes('六価クロム(Cr6+)');
@@ -2408,8 +2516,8 @@ function updateFlowPreview() {
 
   // 放流先ラベル更新
   const dischargeLabel = document.querySelector('#fn-discharge .node-label');
-  if (data.discharge_dest && dischargeLabel) {
-    dischargeLabel.textContent = data.discharge_dest + 'へ';
+  if (dischargeLabel) {
+    dischargeLabel.textContent = data.discharge_dest ? data.discharge_dest + 'へ' : '直接放流';
   }
 }
 
@@ -2430,6 +2538,8 @@ function setArrow(id, show) {
 
 // ===== Summary =====
 function updateSummary() {
+  updateFlowPreview();
+  renderBatchCapacity();
   const rows = [
     ['業種', data.industry ? getIndustryLabel(data.industry) : ''],
     ['排水量', data.daily_volume ? data.daily_volume + ' m³/日' : ''],
@@ -2447,6 +2557,56 @@ function updateSummary() {
     </div>`).join('');
   document.getElementById('data-summary').innerHTML = html;
   saveToLocalStorage();
+}
+
+// The same renderer is used by the live form and the printable result.
+function buildBatchCapacityHTML(d) {
+  const result = WizardCore.calculateBatchCapacity(d);
+  const labels = {
+    incomplete: '未判定：計算条件が不足しています',
+    invalid: '未判定：入力条件を修正してください',
+    insufficient: '処理能力不足：運転時間内に処理しきれません',
+    at_limit: '時間の余裕なし：運転可能時間と必要時間が同じです',
+    sufficient: '入力条件上は運転時間内に処理できます'
+  };
+  const format = (value) => value > 0 && value < 0.001 ? '0.001未満' : value.toLocaleString('ja-JP', { maximumFractionDigits: 3 });
+  const condition = (value, unit) => String(value ?? '').trim() ? `${value} ${unit}` : '未入力';
+  const basis = [
+    `排水量 ${condition(d.daily_volume, 'm³/日')}`,
+    `装置容量 ${condition(d.tank_capacity, '')}`,
+    `有効使用率 ${condition(d.working_volume_percent, '%')}`,
+    `運転可能時間 ${condition(d.operating_hours, '時間/日')}`,
+    `所要時間 ${condition(d.batch_cycle_minutes, '分/回')}`
+  ].join(' ／ ');
+  let details = '';
+  if (result.errors.length) details += `<p class="capacity-help">${result.errors.map(escapeHtml).join('<br>')}</p>`;
+  if (result.missing.length) details += `<p class="capacity-help">未入力：${result.missing.map(escapeHtml).join('、')}</p>`;
+  if (!result.errors.length && !result.missing.length) {
+    const rows = [
+      ['1バッチの有効処理量', `${format(result.effectiveBatchM3)} m³/回`],
+      ['必要バッチ数（端数切り上げ）', `${format(result.requiredBatches)} 回/日`],
+      ['実行可能バッチ数（端数切り捨て）', `${format(result.possibleBatches)} 回/日`],
+      ['必要運転時間', `${format(result.requiredMinutes / 60)} 時間/日`],
+      ['日処理可能量', `${format(result.dailyCapacityM3)} m³/日`],
+      [result.timeMarginMinutes < 0 ? '不足する運転時間' : '運転時間の余裕', `${format(Math.abs(result.timeMarginMinutes) / 60)} 時間/日`],
+      ['1日の未処理量', `${format(result.shortfallM3)} m³/日`]
+    ];
+    details += `<dl class="capacity-metrics">${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>`;
+    if (result.status === 'insufficient' || result.status === 'at_limit') {
+      details += '<p class="capacity-help">装置容量・運転可能時間を見直し、所要時間と有効使用率を実機条件で確認してください。</p>';
+    }
+  }
+  return `<div class="capacity-report" data-status="${result.status}">
+    <p class="capacity-status" role="status" aria-live="polite">${labels[result.status]}</p>
+    ${details}
+    <p class="capacity-help">計算条件：${escapeHtml(basis)}</p>
+    <p class="capacity-help">装置1台で順次処理し、端数のバッチにも所要時間の全量を見込みます。「1日のバッチ回数」の選択値は幅があるため計算に使いません。排水量のピーク変動・原水槽の貯留能力・処理水質は別途確認が必要です。</p>
+    <p class="capacity-help">計算式：有効処理量 = 装置容量(L) ÷ 1000 × 有効使用率 ÷ 100。必要回数 = 排水量 ÷ 有効処理量（切り上げ）。実行可能回数 = 運転可能時間 × 60 ÷ 所要時間（切り捨て）。日処理可能量 = 実行可能回数 × 有効処理量。数値は表示時のみ小数第3位に丸めます。</p>
+  </div>`;
+}
+
+function renderBatchCapacity() {
+  document.getElementById('capacity-preview').innerHTML = buildBatchCapacityHTML(data);
 }
 
 function getIndustryLabel(v) {
@@ -2484,23 +2644,40 @@ const wastewaterOptions = {
 };
 
 let pumpRowCount = 0;
+function equipmentSelect(idx, field, values, value, label) {
+  const choices = ['', ...values];
+  if (value && !choices.includes(value)) choices.push(value);
+  return `<label style="display:block;margin-top:6px;font-size:11px;">${label}
+    <select aria-label="追加機器${idx + 1} ${label}" onchange="updateExtraPump(${idx},'${field}',this.value)" style="width:100%;padding:7px;">
+      ${choices.map(choice => `<option value="${escapeAttr(choice)}" ${choice === (value || '') ? 'selected' : ''}>${escapeHtml(choice || '未指定')}</option>`).join('')}
+    </select></label>`;
+}
+
+function appendPumpRow(idx, pump) {
+  const tr = document.createElement('tr');
+  tr.id = 'pump-row-' + idx;
+  tr.style.borderBottom = '1px solid var(--border)';
+  tr.innerHTML = `
+    <td style="padding:8px 4px;min-width:190px;">
+      <input type="text" aria-label="追加機器${idx + 1} 機器名" placeholder="例: 原水槽攪拌機" style="width:100%;" oninput="updateExtraPump(${idx},'name',this.value)" value="${escapeAttr(pump.name)}">
+      ${equipmentSelect(idx, 'kind', WizardCore.EQUIPMENT_KINDS, pump.kind, '機器種別')}
+      ${equipmentSelect(idx, 'tank', WizardCore.EQUIPMENT_TANKS, pump.tank, '設置槽')}
+    </td>
+    <td style="padding:4px;"><input type="number" aria-label="追加機器${idx + 1} 台数" min="0" step="1" placeholder="1" style="width:52px;text-align:center;" oninput="updateExtraPump(${idx},'count',this.value)" value="${escapeAttr(pump.count)}"></td>
+    <td style="padding:4px;"><input type="number" aria-label="追加機器${idx + 1} 容量(kW)" min="0" step="0.1" placeholder="0.1" style="width:72px;text-align:center;" oninput="updateExtraPump(${idx},'lph',this.value)" value="${escapeAttr(pump.lph)}"></td>
+    <td style="padding:4px;"><input type="number" aria-label="追加機器${idx + 1} 定格電流(A)" min="0" step="0.1" placeholder="—" style="width:72px;text-align:center;" oninput="updateExtraPump(${idx},'amp',this.value)" value="${escapeAttr(pump.amp)}"></td>
+    <td style="padding:4px;text-align:center;"><button type="button" aria-label="追加機器${idx + 1}を削除" onclick="removePumpRow(${idx})" style="background:none;border:none;color:var(--warn);cursor:pointer;font-size:16px;">✕</button></td>`;
+  document.getElementById('extra-pump-rows').appendChild(tr);
+}
+
 function addPumpRow() {
   const empty = document.getElementById('extra-pump-empty');
   if (empty) empty.remove();
   const idx = pumpRowCount++;
   if (!data.extra_pumps) data.extra_pumps = [];
-  data.extra_pumps.push({ name: '', count: '', lph: '', amp: '' });
-  const tr = document.createElement('tr');
-  tr.id = 'pump-row-' + idx;
-  tr.style.borderBottom = '1px solid var(--border)';
-  tr.innerHTML = `
-    <td style="padding:4px;"><input type="text" placeholder="例: 移送ポンプ" style="width:100%;" oninput="updateExtraPump(${idx}, 'name', this.value)"></td>
-    <td style="padding:4px;"><input type="number" min="0" placeholder="1" style="width:52px; text-align:center;" oninput="updateExtraPump(${idx}, 'count', this.value)"></td>
-    <td style="padding:4px;"><input type="number" min="0" step="0.1" placeholder="0.1" style="width:72px; text-align:center;" oninput="updateExtraPump(${idx}, 'lph', this.value)"></td>
-    <td style="padding:4px;"><input type="number" min="0" step="0.1" placeholder="—" style="width:72px; text-align:center;" oninput="updateExtraPump(${idx}, 'amp', this.value)" title="定格電流(A)"></td>
-    <td style="padding:4px; text-align:center;"><button type="button" onclick="removePumpRow(${idx})" style="background:none; border:none; color:var(--warn); cursor:pointer; font-size:16px;">✕</button></td>
-  `;
-  document.getElementById('extra-pump-rows').appendChild(tr);
+  const pump = { name: '', kind: 'ポンプ', tank: '', count: '1', lph: '', amp: '' };
+  data.extra_pumps[idx] = pump;
+  appendPumpRow(idx, pump);
   saveToLocalStorage();
 }
 function removePumpRow(idx) {
@@ -2512,7 +2689,7 @@ function removePumpRow(idx) {
     empty.id = 'extra-pump-empty';
     empty.style.color = 'var(--text3)';
     empty.style.fontSize = '12px';
-    empty.innerHTML = '<td colspan="5" style="padding:12px 4px; text-align:center;">「＋ポンプを追加」から入力してください</td>';
+    empty.innerHTML = '<td colspan="5" style="padding:12px 4px; text-align:center;">「＋機器を追加」から入力してください</td>';
     document.getElementById('extra-pump-rows').appendChild(empty);
   }
   updateSummary();
@@ -2667,234 +2844,33 @@ function selectWastewaterType(value) {
 }
 
 // ===== SVG Flow Diagram Generator =====
-// 変更箇所: 旧HTMLベースのフロー図をSVGテンプレート方式に置換
 function buildFlowSVG(d) {
-  const chemicals = Array.isArray(d.chemicals) ? d.chemicals.filter(Boolean) : [];
-  const displayedChemicals = d.powder_feeder === '使用する'
-    ? chemicals.filter(chemical => chemical !== '液体凝集剤')
-    : chemicals;
-  const topInputs = [...displayedChemicals];
-  // その他薬品を台数分展開してフロー図に追加
-  const otherCount = parseInt(d.chem_other_count) || 0;
-  if (otherCount > 0) {
-    for (let i = 1; i <= otherCount; i++) {
-      const key = otherCount === 1 ? 'その他' : `その他 ${i}`;
-      const customName = (d.chem_details || {})[key]?.name;
-      topInputs.push(customName || (otherCount === 1 ? 'その他' : `その他${i}`));
-    }
-  }
-  if (d.powder_feeder === '使用する' && !topInputs.includes('粉体供給機')) topInputs.push('粉体供給機');
+  return WizardFlow.build(d);
+}
 
-  const FF = "'Helvetica Neue',Arial,sans-serif";
-  const C = {
-    hdrBg: '#f0faf6',
-    hdrLine: '#b8e8d8',
-    secLbl: '#9ca3af',
-    txt: '#111827',
-    sub: '#6b7280',
-    arrow: '#00856a',
-    tankFill: '#eef7fb', tankStr: '#0b84d8',
-    pumpFill: '#eef2ff', pumpStr: '#4f6cf7',
-    coagFill: '#eefaf4', coagStr: '#00856a',
-    endFill: '#eef7fb', endStr: '#005fb8',
-    topFill: '#f8fafc', topStr: '#64748b'
-  };
+function setFlowScale(actualSize) {
+  const svg = document.querySelector('#result-flow svg');
+  if (!svg) return;
+  svg.style.width = actualSize ? svg.getAttribute('width') + 'px' : '100%';
+  document.getElementById('flow-fit').setAttribute('aria-pressed', String(!actualSize));
+  document.getElementById('flow-actual').setAttribute('aria-pressed', String(actualSize));
+}
 
-  const nodeW = 130;
-  const nodeH = 64;
-  const topNodeW = 116;
-  const topNodeH = 40;
-  const topGap = 14;
-  const centerStep = topNodeW + topGap;
-  const marginL = 28;
-  const marginR = 28;
-  const headerH = 84;
+function shouldUseActualFlowSizeByDefault() {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 600px)').matches;
+}
 
-  const hasRelay = (d.option_tanks || []).includes('中継槽');
-  const hasMonitor = (d.option_tanks || []).includes('監視槽');
-  const hasSludgeTank = (d.option_tanks || []).includes('汚泥貯槽');
-  const noFilter = d.filter_branches === 'ろ過しない';
-  const filterConfigured = Boolean(d.filter_branches) && d.filter_branches !== '不明' && !noFilter;
-
-  // 原水ポンプ削除。中継槽あり：原水槽→中継槽→凝集沈殿槽
-  const rawX    = marginL;
-  const relayX  = hasRelay ? rawX + 180 : null;
-  const coagX   = hasRelay ? rawX + 360 : rawX + 200;
-
-  // 監視槽あり：監視槽の真下にろ過装置、放流×2を縦揃え
-  const monitorX   = hasMonitor ? coagX + 200 : null;
-  const filterX    = hasMonitor ? monitorX     : coagX;
-  const dischargeX = (hasMonitor ? monitorX : coagX) + nodeW + 80;
-  const lowerX     = dischargeX;
-
-  const mainY = headerH + 178;
-  const dischargeY = mainY;
-  const filterY = mainY + 138;
-  const topY = headerH + 28;
-  const coagTopY = mainY;
-  const coagCX = coagX + nodeW / 2;
-
-  const trunc = (s, n = 12) => {
-    const str = String(s || '');
-    return str.length > n ? str.slice(0, n - 1) + '…' : str;
-  };
-  const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-  const count = topInputs.length;
-  let boxCenters = [];
-  if (count > 0 && count <= 4) {
-    const offsetBase = (count - 1) / 2;
-    boxCenters = topInputs.map((_, idx) => coagCX + (idx - offsetBase) * centerStep);
-  }
-
-  const specialExtent = boxCenters.length
-    ? Math.max(...boxCenters.map(x => x + topNodeW / 2)) + marginR
-    : 0;
-  const totalTopW = count > 0 ? count * topNodeW + (count - 1) * topGap : 0;
-  const baseSvgW = Math.max(700, lowerX + nodeW + marginR);
-  let svgW = Math.max(baseSvgW, specialExtent, totalTopW > 0 ? totalTopW + marginL + marginR : baseSvgW);
-  const svgH = noFilter ? filterY + nodeH + 44 : filterY + nodeH + 44;
-
-  if (count >= 5) {
-    const topStartX = Math.max(marginL, (svgW - totalTopW) / 2);
-    boxCenters = topInputs.map((_, idx) => topStartX + topNodeW / 2 + idx * centerStep);
-  }
-
-  const p = [];
-  p.push(`<defs>
-    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="${C.arrow}"/>
-    </marker>
-  </defs>`);
-
-  p.push(`<rect width="${svgW}" height="${svgH}" fill="#fff" rx="8" stroke="#e5e7eb" stroke-width="1"/>`);
-  p.push(`<rect x="0" y="0" width="${svgW}" height="${headerH}" fill="${C.hdrBg}" rx="8"/>`);
-  p.push(`<rect x="0" y="${headerH - 8}" width="${svgW}" height="8" fill="${C.hdrBg}"/>`);
-  p.push(`<line x1="0" y1="${headerH}" x2="${svgW}" y2="${headerH}" stroke="${C.hdrLine}" stroke-width="1"/>`);
-
-  const infoItems = [
-    ['排水種類', d.wastewater_type || '—'],
-    ['排水量', d.daily_volume ? d.daily_volume + ' m³/日' : '—'],
-    ['装置容量', d.tank_capacity || '—'],
-    ['ろ過分岐数', d.filter_branches || '—']
-  ];
-  const icW = svgW / infoItems.length;
-  infoItems.forEach(([k, v], i) => {
-    const ix = i * icW;
-    if (i > 0) p.push(`<line x1="${ix}" y1="12" x2="${ix}" y2="${headerH - 8}" stroke="#cce8dc" stroke-width="1"/>`);
-    p.push(`<text x="${ix + icW / 2}" y="34" text-anchor="middle" font-family="${FF}" font-size="10" fill="${C.secLbl}">${esc(k)}</text>`);
-    p.push(`<text x="${ix + icW / 2}" y="58" text-anchor="middle" font-family="${FF}" font-size="13" font-weight="700" fill="${C.txt}">${esc(trunc(v, 16))}</text>`);
-  });
-
-  p.push(`<text x="${marginL}" y="${topY - 8}" font-family="${FF}" font-size="9" fill="${C.secLbl}" letter-spacing="1.5">投入要素</text>`);
-  p.push(`<text x="${marginL}" y="${mainY - 10}" font-family="${FF}" font-size="9" fill="${C.secLbl}" letter-spacing="1.5">主処理ライン</text>`);
-
-  const drawNode = (x, y, label, sub, type = 'main') => {
-    let fill = C.topFill, str = C.topStr, sw = 1.6;
-    if (type === 'tank') { fill = C.tankFill; str = C.tankStr; }
-    else if (type === 'pump') { fill = C.pumpFill; str = C.pumpStr; }
-    else if (type === 'coag') { fill = C.coagFill; str = C.coagStr; sw = 2; }
-    else if (type === 'end') { fill = C.endFill; str = C.endStr; sw = 2; }
-
-    p.push(`<rect x="${x}" y="${y}" width="${nodeW}" height="${nodeH}" rx="8" fill="${fill}" stroke="${str}" stroke-width="${sw}"/>`);
-    p.push(`<text x="${x + nodeW / 2}" y="${y + 24}" text-anchor="middle" font-family="${FF}" font-size="12" font-weight="700" fill="${C.txt}">${esc(label)}</text>`);
-    if (sub) {
-      p.push(`<text x="${x + nodeW / 2}" y="${y + 41}" text-anchor="middle" font-family="${FF}" font-size="10" fill="${C.sub}">${esc(sub)}</text>`);
-    }
-  };
-
-  const drawTopBox = (centerX, label) => {
-    const boxX = centerX - topNodeW / 2;
-    p.push(`<rect x="${boxX}" y="${topY}" width="${topNodeW}" height="${topNodeH}" rx="7" fill="#f8fafc" stroke="#64748b" stroke-width="1.4"/>`);
-    p.push(`<text x="${centerX}" y="${topY + 25}" text-anchor="middle" font-family="${FF}" font-size="11" font-weight="700" fill="${C.txt}">${esc(trunc(label, 12))}</text>`);
-    return { x: centerX, y: topY + topNodeH };
-  };
-
-  const drawStraightDown = (x, fromY, toY) => {
-    p.push(`<line x1="${x}" y1="${fromY}" x2="${x}" y2="${toY}" stroke="${C.arrow}" stroke-width="2.2" marker-end="url(#ah)"/>`);
-  };
-
-  const drawOrthogonalDown = (fromX, fromY, elbowY, targetX, targetY) => {
-    p.push(`<line x1="${fromX}" y1="${fromY}" x2="${fromX}" y2="${elbowY}" stroke="${C.arrow}" stroke-width="2.2"/>`);
-    p.push(`<line x1="${fromX}" y1="${elbowY}" x2="${targetX}" y2="${elbowY}" stroke="${C.arrow}" stroke-width="2.2"/>`);
-    p.push(`<line x1="${targetX}" y1="${elbowY}" x2="${targetX}" y2="${targetY}" stroke="${C.arrow}" stroke-width="2.2" marker-end="url(#ah)"/>`);
-  };
-
-  if (count > 0) {
-    const boxes = topInputs.map((item, idx) => ({ ...drawTopBox(boxCenters[idx], item), label: item }));
-
-    if (count === 1) {
-      drawStraightDown(boxes[0].x, boxes[0].y, coagTopY);
-    } else {
-      const manifoldY = topY + topNodeH + 18;
-      const leftX = boxes[0].x;
-      const rightX = boxes[boxes.length - 1].x;
-
-      boxes.forEach(box => {
-        p.push(`<line x1="${box.x}" y1="${box.y}" x2="${box.x}" y2="${manifoldY}" stroke="${C.arrow}" stroke-width="2.2"/>`);
-      });
-
-      p.push(`<line x1="${leftX}" y1="${manifoldY}" x2="${rightX}" y2="${manifoldY}" stroke="${C.arrow}" stroke-width="2.2"/>`);
-      p.push(`<line x1="${coagCX}" y1="${manifoldY}" x2="${coagCX}" y2="${coagTopY}" stroke="${C.arrow}" stroke-width="2.2" marker-end="url(#ah)"/>`);
-    }
-  }
-
-  drawNode(rawX, mainY, '原水槽', '', 'tank');
-  if (hasRelay)   drawNode(relayX,   mainY, '中継槽',   '', 'tank');
-  drawNode(coagX,  mainY, '凝集沈殿槽', 'pH調整 → 凝集 → 沈殿', 'coag');
-  if (hasMonitor) drawNode(monitorX, mainY, '監視槽',   '', 'tank');
-  drawNode(dischargeX, mainY, '放流', d.discharge_dest || '放流先', 'end');
-
-  // 未確認時にろ過装置を勝手に描かず、選択済みの汚泥貯槽はフローにも反映する。
-  if (noFilter) {
-    drawNode(filterX, filterY, hasSludgeTank ? '汚泥貯槽' : '汚泥処理', hasSludgeTank ? '' : '要確認', 'tank');
-  } else if (!filterConfigured) {
-    drawNode(filterX, filterY, 'ろ過条件', '要確認', 'tank');
-  } else {
-    drawNode(filterX, filterY, hasSludgeTank ? '汚泥貯槽・ろ過装置' : 'ろ過装置', hasSludgeTank ? 'スラッジ貯留・ろ過' : 'スラッジろ過', hasSludgeTank ? 'tank' : 'coag');
-    drawNode(lowerX,   filterY, '放流', '', 'end');
-  }
-
-  const mainCy   = mainY + nodeH / 2;
-  const filterCy = filterY + nodeH / 2;
-
-  // 原水槽 → (中継槽 →) 凝集沈殿槽
-  if (hasRelay) {
-    p.push(`<line x1="${rawX + nodeW}" y1="${mainCy}" x2="${relayX - 12}" y2="${mainCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
-    p.push(`<line x1="${relayX + nodeW}" y1="${mainCy}" x2="${coagX - 12}" y2="${mainCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
-  } else {
-    p.push(`<line x1="${rawX + nodeW}" y1="${mainCy}" x2="${coagX - 12}" y2="${mainCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
-  }
-
-  // 凝集沈殿槽 → (監視槽 →) 放流（上澄液ライン）
-  if (hasMonitor) {
-    p.push(`<line x1="${coagX + nodeW}" y1="${mainCy}" x2="${monitorX - 12}" y2="${mainCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
-    p.push(`<text x="${coagX + nodeW + 8}" y="${mainCy - 6}" font-family="${FF}" font-size="10" fill="${C.sub}">上澄液</text>`);
-    p.push(`<line x1="${monitorX + nodeW}" y1="${mainCy}" x2="${dischargeX - 12}" y2="${mainCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
-  } else {
-    p.push(`<line x1="${coagX + nodeW}" y1="${mainCy}" x2="${dischargeX - 12}" y2="${mainCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
-    p.push(`<text x="${coagX + nodeW + 8}" y="${mainCy - 6}" font-family="${FF}" font-size="10" fill="${C.sub}">上澄液</text>`);
-  }
-
-  // スラッジライン：凝集沈殿槽の真下へ
-  const sludgeDnX = coagX + nodeW / 2;
-
-  if (hasMonitor) {
-    const filterInX = filterX;
-    p.push(`<line x1="${sludgeDnX}" y1="${mainY + nodeH}" x2="${sludgeDnX}" y2="${filterCy}" stroke="${C.arrow}" stroke-width="2.2"/>`);
-    p.push(`<line x1="${sludgeDnX}" y1="${filterCy}" x2="${filterInX - 12}" y2="${filterCy}" stroke="${C.arrow}" stroke-width="2.2" marker-end="url(#ah)"/>`);
-    p.push(`<text x="${sludgeDnX + 6}" y="${filterCy - 6}" font-family="${FF}" font-size="10" fill="${C.sub}">${noFilter ? '汚泥' : 'スラッジ'}</text>`);
-  } else {
-    p.push(`<line x1="${sludgeDnX}" y1="${mainY + nodeH}" x2="${sludgeDnX}" y2="${filterY - 12}" stroke="${C.arrow}" stroke-width="2.2" marker-end="url(#ah)"/>`);
-    p.push(`<text x="${sludgeDnX + 6}" y="${(mainY + nodeH + filterY) / 2}" font-family="${FF}" font-size="10" fill="${C.sub}">${noFilter ? '汚泥' : 'スラッジ'}</text>`);
-  }
-
-  // ろ過装置 → 放流（下）：未確認・ろ過なしの場合は描画しない
-  if (filterConfigured) {
-    p.push(`<line x1="${filterX + nodeW}" y1="${filterCy}" x2="${lowerX - 12}" y2="${filterCy}" stroke="${C.arrow}" stroke-width="2.6" marker-end="url(#ah)"/>`);
-  }
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" style="display:block;min-width:${svgW}px;border-radius:6px;">${p.join('')}<\/svg>`;
+function downloadFlowSVG() {
+  const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n', buildFlowSVG(data)], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const name = (data.customer_name || '排水処理設備').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 60);
+  link.href = url;
+  link.download = name + '_概略フロー図.svg';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function renderMissingCheck(validation = WizardCore.validateData(data)) {
@@ -2948,7 +2924,9 @@ function generateResult() {
 
   // ---- フロー図（SVG生成 — buildFlowSVG に委譲）----
   document.getElementById('result-flow').innerHTML = buildFlowSVG(data);
+  setFlowScale(shouldUseActualFlowSizeByDefault());
   renderMissingCheck(validation);
+  document.getElementById('result-capacity').innerHTML = buildBatchCapacityHTML(data);
 
   // ---- データテーブル ----
   const sensorSummary = WizardCore.calculateSensors(data).details.join('、');
@@ -2987,7 +2965,7 @@ function generateResult() {
     ['電源コード長さ', data.power_cable_length ? data.power_cable_length + ' m' : ''],
     ['一次側電源の接続形状', data.primary_power_connection],
     ...((data.extra_pumps||[]).filter(Boolean).map((p,i) =>
-      [`追加ポンプ${i+1}`, [p.name, p.count ? p.count+'台' : '', p.lph ? p.lph+'kW' : '', p.amp ? p.amp+'A' : ''].filter(Boolean).join(' / ')]
+      [`追加機器${i+1}`, [p.name, p.kind || '種別未指定', p.tank ? '設置槽：'+p.tank : '設置槽未指定', p.count ? p.count+'台' : '', p.lph ? p.lph+'kW' : '', p.amp ? p.amp+'A' : ''].filter(Boolean).join(' / ')]
     )),
     ['レベルセンサー', sensorSummary],
     ['設置スペース', data.space_area ? data.space_area + ' ㎡' : ''],
@@ -3093,7 +3071,7 @@ function resetFormUI() {
 
   document.getElementById('extra-pump-rows').innerHTML =
     '<tr id="extra-pump-empty" style="color:var(--text3); font-size:12px;">' +
-    '<td colspan="5" style="padding:12px 4px; text-align:center;">「＋ポンプを追加」から入力してください</td></tr>';
+    '<td colspan="5" style="padding:12px 4px; text-align:center;">「＋機器を追加」から入力してください</td></tr>';
   pumpRowCount = 0;
 
   document.getElementById('chem_other_wrap').style.display = 'none';
@@ -3102,6 +3080,7 @@ function resetFormUI() {
   document.getElementById('pump-calc-result').style.display = 'none';
   document.getElementById('sensor-other-wrap').style.display = 'none';
   document.getElementById('sensor-count-result').style.display = 'none';
+  document.getElementById('dehydrator-detail').style.display = 'none';
 
   document.getElementById('wastewater_type_select').innerHTML =
     '<option value="">業種を選択すると候補が表示されます</option>';
@@ -3128,6 +3107,7 @@ document.addEventListener('keydown', e => {
 
 // Init
 updateFlowPreview();
+renderBatchCapacity();
 loadFromLocalStorage();
 </script>
 </body>

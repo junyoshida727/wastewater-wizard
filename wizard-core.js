@@ -11,6 +11,7 @@
     install_type: '', delivery_pref: '', delivery_city: '',
     industry: '', wastewater_type: '', daily_volume: '', working_days: '', batch_count: '',
     tank_capacity: '', filter_branches: '', powder_feeder: '',
+    operating_hours: '', batch_cycle_minutes: '', working_volume_percent: '',
     chemicals: [], chem_other_selected: false, pump_count: 0, chem_other_count: '', chem_details: {},
     ph_min: '', ph_max: '', raw_water_temp: '', sludge_amount: '',
     metals: [], hazardous: [], other_contam: [],
@@ -40,6 +41,24 @@
     return Array.isArray(value) ? value.filter(Boolean) : [];
   }
 
+  const EQUIPMENT_KINDS = ['ポンプ', '攪拌機', 'その他'];
+  const EQUIPMENT_TANKS = ['原水槽', '凝集沈殿槽', '中継槽', '汚泥貯槽', '監視槽', 'ろ過受け槽'];
+
+  function getProcessConfig(data) {
+    const tanks = asArray(data.option_tanks);
+    const basketCount = new Map([['分岐なし', 1], ['2分岐', 2], ['3分岐', 3], ['4分岐', 4], ['5分岐', 5]]).get(data.filter_branches) || 0;
+    return { hasRelay: tanks.includes('中継槽'), hasMonitor: tanks.includes('監視槽'),
+      hasSludge: tanks.includes('汚泥貯槽'), basketCount, filterConfigured: basketCount > 0 };
+  }
+
+  function getEquipmentTanks(data) {
+    return EQUIPMENT_TANKS.filter(tank => {
+      if (tank === '原水槽' || tank === '凝集沈殿槽') return true;
+      if (tank === 'ろ過受け槽') return getProcessConfig(data).filterConfigured;
+      return asArray(data.option_tanks).includes(tank);
+    });
+  }
+
   function normalizeData(raw) {
     const source = raw && typeof raw === 'object' ? raw : {};
     const normalized = createInitialData();
@@ -55,7 +74,9 @@
     // Keep deleted row placeholders while the wizard is open. The DOM uses the
     // original row index for subsequent edits, so compacting this array corrupts data.
     normalized.extra_pumps = Array.isArray(source.extra_pumps)
-      ? source.extra_pumps.map((pump) => pump && typeof pump === 'object' ? pump : null)
+      ? source.extra_pumps.map((pump) => pump && typeof pump === 'object' ? {
+        ...pump, kind: asString(pump.kind), tank: asString(pump.tank)
+      } : null)
       : [];
     normalized.chem_details = source.chem_details && typeof source.chem_details === 'object' ? source.chem_details : {};
 
@@ -121,10 +142,66 @@
     return Number.isFinite(number) && number >= min && number <= max;
   }
 
+  // One unit, sequential batches, completed within the daily operating window.
+  // No assumed cycle time or usable volume: unknown conditions stay unknown.
+  function calculateBatchCapacity(data) {
+    const missing = [];
+    const errors = [];
+    const fields = [
+      ['daily_volume', '1日の排水量', Infinity],
+      ['operating_hours', '運転可能時間', 24],
+      ['batch_cycle_minutes', '1バッチの所要時間', Infinity],
+      ['working_volume_percent', '容量の有効使用率', 100]
+    ];
+    fields.forEach(([key, label, max]) => {
+      if (!isPresent(data[key])) {
+        missing.push(label);
+      } else if (!Number.isFinite(Number(data[key])) || Number(data[key]) <= 0 || Number(data[key]) > max) {
+        errors.push(`${label}は0より大きい${Number.isFinite(max) ? `${max}以下の` : ''}数値で入力してください。`);
+      }
+    });
+    const capacities = { '200L': 200, '500L': 500, '1000L': 1000 };
+    if (!isPresent(data.tank_capacity)) missing.push('排水処理装置の容量');
+    else if (!Object.prototype.hasOwnProperty.call(capacities, data.tank_capacity)) errors.push('装置容量は200L・500L・1000Lから選択してください。');
+    if (errors.length || missing.length) {
+      return { status: errors.length ? 'invalid' : 'incomplete', missing, errors };
+    }
+
+    // Correct only floating-point noise at integer boundaries, before ceil/floor.
+    const snapInteger = (value) => {
+      const nearest = Math.round(value);
+      return Math.abs(value - nearest) <= 8 * Number.EPSILON * Math.max(1, Math.abs(value)) ? nearest : value;
+    };
+    const effectiveBatchM3 = capacities[data.tank_capacity] / 1000 * Number(data.working_volume_percent) / 100;
+    const availableMinutes = Number(data.operating_hours) * 60;
+    const cycleMinutes = Number(data.batch_cycle_minutes);
+    const requiredBatches = Math.max(1, Math.ceil(snapInteger(Number(data.daily_volume) / effectiveBatchM3)));
+    const possibleBatches = Math.floor(snapInteger(availableMinutes / cycleMinutes));
+    const requiredMinutes = requiredBatches * cycleMinutes;
+    const dailyCapacityM3 = possibleBatches * effectiveBatchM3;
+    if (effectiveBatchM3 <= 0 || !Number.isSafeInteger(requiredBatches) || !Number.isSafeInteger(possibleBatches) ||
+        !Number.isFinite(requiredMinutes) || !Number.isFinite(dailyCapacityM3)) {
+      return { status: 'invalid', missing: [], errors: ['処理能力の計算範囲を超えています。排水量・有効使用率・所要時間を確認してください。'] };
+    }
+    const rawTimeMargin = availableMinutes - requiredMinutes;
+    const timeMarginMinutes = Math.abs(rawTimeMargin) <= 8 * Number.EPSILON * Math.max(1, availableMinutes, requiredMinutes)
+      ? 0 : rawTimeMargin;
+    return {
+      status: requiredBatches > possibleBatches ? 'insufficient' : timeMarginMinutes === 0 ? 'at_limit' : 'sufficient',
+      missing, errors, effectiveBatchM3, requiredBatches, possibleBatches,
+      requiredMinutes, availableMinutes, dailyCapacityM3, timeMarginMinutes,
+      shortfallM3: requiredBatches > possibleBatches ? Math.max(0, Number(data.daily_volume) - dailyCapacityM3) : 0
+    };
+  }
+
   function validateData(data) {
     const errors = [];
     const warnings = [];
     const addWarning = (condition, message) => { if (condition) warnings.push(message); };
+    const capacity = calculateBatchCapacity(data);
+    errors.push(...capacity.errors);
+    addWarning(capacity.status === 'insufficient', 'バッチ処理能力が不足しています。装置容量・運転時間・処理条件を見直してください。');
+    addWarning(capacity.status === 'at_limit', 'バッチ処理の必要時間が運転可能時間と同じです。時間の余裕を確認してください。');
 
     if (!isNumberInRange(data.ph_min, 0, 14) || !isNumberInRange(data.ph_max, 0, 14)) {
       errors.push('pHは0から14の範囲で入力してください。');
@@ -132,15 +209,12 @@
     if (isPresent(data.ph_min) && isPresent(data.ph_max) && Number(data.ph_min) > Number(data.ph_max)) {
       errors.push('pHの最小値は最大値以下にしてください。');
     }
-    [['daily_volume', '1日の排水量'], ['raw_tank_size', '原水槽のサイズ'], ['space_area', '設置スペース'],
+    [['raw_tank_size', '原水槽のサイズ'], ['space_area', '設置スペース'],
       ['power_cable_length', '電源コード長さ'], ['pipe_distance', '横引き距離']].forEach(([key, label]) => {
       if (isPresent(data[key]) && (!Number.isFinite(Number(data[key])) || Number(data[key]) < 0)) {
         errors.push(`${label}は0以上の数値で入力してください。`);
       }
     });
-    if (isPresent(data.daily_volume) && Number(data.daily_volume) <= 0) {
-      errors.push('1日の排水量は0より大きい数値で入力してください。');
-    }
     if (isPresent(data.working_days) && (!Number.isFinite(Number(data.working_days)) || Number(data.working_days) < 1 || Number(data.working_days) > 31)) {
       errors.push('稼働日数は1から31の範囲で入力してください。');
     }
@@ -154,18 +228,26 @@
       const invalid = asArray(data[field]).filter((tank) => !asArray(data.option_tanks).includes(tank));
       if (invalid.length) warnings.push(`${label}の設置槽（${invalid.join('、')}）がオプション槽に含まれていません。内容を確認してください。`);
     });
+    const absentSensors = asArray(data.level_sensors).filter(tank => !getEquipmentTanks(data).includes(tank));
+    if (absentSensors.length) warnings.push(`レベルセンサーの設置槽（${absentSensors.join('、')}）が現在の構成にありません。設置先を確認してください。`);
     if (data.chem_other_selected && getOtherChemicalKeys(data).length === 0) {
       errors.push('その他の薬品を選択した場合は、薬注ポンプ台数を選択してください。');
     }
     if (data.sensor_other_selected && (!isPresent(data.sensor_other_count) || !isPresent(data.sensor_other_note))) {
       errors.push('その他のレベルセンサーは、台数と設置箇所を入力してください。');
     }
-    asArray(data.extra_pumps).forEach((pump) => {
+    asArray(data.extra_pumps).forEach((pump, index) => {
       ['count', 'lph', 'amp'].forEach((field) => {
         if (isPresent(pump[field]) && (!Number.isFinite(Number(pump[field])) || Number(pump[field]) < 0)) {
-          errors.push('追加ポンプの台数・容量・定格電流は0以上の数値で入力してください。');
+          errors.push('追加機器の台数・容量・定格電流は0以上の数値で入力してください。');
         }
       });
+      if (isPresent(pump.count) && !Number.isSafeInteger(Number(pump.count))) errors.push('追加機器の台数は整数で入力してください。');
+      if (Number(pump.count) === 0 && isPresent(pump.count)) return;
+      const label = `追加機器${index + 1}（${pump.name || '名称未入力'}）`;
+      addWarning(!EQUIPMENT_KINDS.includes(pump.kind), `${label}の機器種別を選択してください。`);
+      addWarning(!EQUIPMENT_TANKS.includes(pump.tank), `${label}の設置槽を選択してください。`);
+      addWarning(EQUIPMENT_TANKS.includes(pump.tank) && !getEquipmentTanks(data).includes(pump.tank), `${label}の設置槽（${pump.tank}）が現在の構成にありません。`);
     });
 
     addWarning(!isPresent(data.customer_name), '顧客名');
@@ -186,12 +268,17 @@
   }
 
   root.WizardCore = {
+    EQUIPMENT_KINDS,
+    EQUIPMENT_TANKS,
+    getEquipmentTanks,
+    getProcessConfig,
     createInitialData,
     normalizeData,
     getOtherChemicalKeys,
     hasChemicals,
     calculatePumps,
     calculateSensors,
+    calculateBatchCapacity,
     validateData
   };
 })(typeof window !== 'undefined' ? window : globalThis);
