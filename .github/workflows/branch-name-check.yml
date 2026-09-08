@@ -14,10 +14,10 @@ jobs:
           BRANCH: ${{ github.head_ref }}
         run: |
           echo "Branch: $BRANCH"
-          if [[ "$BRANCH" =~ ^(feature|fix)/.+ ]]; then
-            echo "OK: Branch name follows convention (feature/xxx or fix/xxx)"
+          if [[ "$BRANCH" =~ ^(feature|fix|codex)/.+ ]]; then
+            echo "OK: Branch name follows convention (feature/xxx, fix/xxx or codex/xxx)"
           else
             echo "ERROR: Branch name '$BRANCH' does not follow the convention."
-            echo "Use: feature/<description> or fix/<description>"
+            echo "Use: feature/<description>, fix/<description> or codex/<description>"
             exit 1
           fi

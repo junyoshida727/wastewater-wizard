@@ -1100,6 +1100,10 @@
       size: A4 portrait;
       margin: 10mm;
     }
+    @page flow-diagram {
+      size: A4 landscape;
+      margin: 8mm;
+    }
 
     /* 画面UI要素をすべて非表示 */
     body { background: #fff !important; }
@@ -1152,6 +1156,9 @@
       border: 1px solid #ccc !important;
       padding: 10px !important;
       margin-bottom: 8px !important;
+      page: flow-diagram;
+      break-before: page;
+      break-after: page;
       break-inside: avoid;
       overflow: visible !important;
     }
@@ -1167,9 +1174,9 @@
       width: 100% !important;
       min-width: 0 !important;
       height: auto !important;
-      /* A4の印刷可能高277mmから、枠・見出し・余白を差し引く。
+      /* A4横の印刷可能高194mmから、枠・見出し・余白を差し引く。
          SVGの既定preserveAspectRatioにより縦横の両方へ収める。 */
-      max-height: 240mm !important;
+      max-height: 175mm !important;
     }
 
     .fh-node {
@@ -1489,7 +1496,7 @@
           </div>
         </div>
         <p class="capacity-help" id="capacity-conditions-help">運転可能時間は休止・保守時間を除いた時間、所要時間は給水・反応・沈殿・排水・汚泥排出など次のバッチ開始までの全工程を入力。有効使用率は、装置容量のうち1回に受け入れられる原水量の割合です。メーカー仕様・試験結果等をもとに設定してください。入力例は推奨値ではありません。</p>
-        <div id="capacity-preview" role="status" aria-live="polite" aria-atomic="true"></div>
+        <div id="capacity-preview"></div>
       </section>
 
       <div class="field-group">
@@ -2590,7 +2597,7 @@ function buildBatchCapacityHTML(d) {
     }
   }
   return `<div class="capacity-report" data-status="${result.status}">
-    <p class="capacity-status">${labels[result.status]}</p>
+    <p class="capacity-status" role="status" aria-live="polite">${labels[result.status]}</p>
     ${details}
     <p class="capacity-help">計算条件：${escapeHtml(basis)}</p>
     <p class="capacity-help">装置1台で順次処理し、端数のバッチにも所要時間の全量を見込みます。「1日のバッチ回数」の選択値は幅があるため計算に使いません。排水量のピーク変動・原水槽の貯留能力・処理水質は別途確認が必要です。</p>
@@ -2849,6 +2856,10 @@ function setFlowScale(actualSize) {
   document.getElementById('flow-actual').setAttribute('aria-pressed', String(actualSize));
 }
 
+function shouldUseActualFlowSizeByDefault() {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 600px)').matches;
+}
+
 function downloadFlowSVG() {
   const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n', buildFlowSVG(data)], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -2913,7 +2924,7 @@ function generateResult() {
 
   // ---- フロー図（SVG生成 — buildFlowSVG に委譲）----
   document.getElementById('result-flow').innerHTML = buildFlowSVG(data);
-  setFlowScale(false);
+  setFlowScale(shouldUseActualFlowSizeByDefault());
   renderMissingCheck(validation);
   document.getElementById('result-capacity').innerHTML = buildBatchCapacityHTML(data);
 

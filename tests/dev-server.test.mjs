@@ -56,6 +56,11 @@ test('directories, missing files and paths outside the root never stop subsequen
   for (const url of ['/%ZZ', '/%00']) assert.equal((await request(handler, url)).status, 400);
 });
 
+test('invalid server roots fail requests without an unhandled startup rejection', { timeout: 3000 }, async () => {
+  const handler = createRequestHandler('/definitely/not/a/real/root');
+  assert.equal((await request(handler, '/')).status, 500);
+});
+
 test('file disappearance and read failures return an error instead of an unhandled stream event', { timeout: 3000 }, async t => {
   for (const code of ['ENOENT', 'EACCES']) {
     const handler = await fixture(t, () => {

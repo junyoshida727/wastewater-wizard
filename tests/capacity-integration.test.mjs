@@ -8,7 +8,7 @@ const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1];
 
 // Minimal DOM/storage stand-ins exercise the real application handlers without
 // adding a browser dependency. Layout and native controls are checked in-browser.
-function loadWizard(storage = new Map()) {
+function loadWizard(storage = new Map(), options = {}) {
   const makeElement = () => {
     const classes = new Set();
     return {
@@ -65,7 +65,13 @@ function loadWizard(storage = new Map()) {
     },
     setTimeout: callback => timers.push(callback), clearTimeout() {},
     alert: message => alerts.push(message),
-    confirm: message => { confirmations.push(message); return true; }
+    confirm: message => { confirmations.push(message); return true; },
+    matchMedia: query => ({
+      matches: query === '(max-width: 600px)' && (options.viewportWidth ?? 1024) <= 600,
+      media: query,
+      addEventListener() {},
+      removeEventListener() {}
+    })
   });
   context.window = context;
   vm.runInContext(readFileSync('wizard-core.js', 'utf8'), context);
@@ -196,6 +202,14 @@ test('flow size controls switch between natural size and fit, and regeneration r
   app.run('setFlowScale(true); generateResult()');
   assert.equal(app.flowSVG.style.width, '100%');
   assert.equal(app.elements.get('flow-fit').getAttribute('aria-pressed'), 'true');
+});
+
+test('narrow screens open generated flow diagrams at readable actual size', () => {
+  const app = loadWizard(new Map(), { viewportWidth: 375 });
+  app.run('generateResult()');
+  assert.equal(app.flowSVG.style.width, '1680px');
+  assert.equal(app.elements.get('flow-actual').getAttribute('aria-pressed'), 'true');
+  assert.equal(app.elements.get('flow-fit').getAttribute('aria-pressed'), 'false');
 });
 
 test('SVG download is an independent vector document with the current drawing and a safe filename', async () => {

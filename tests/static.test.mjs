@@ -33,3 +33,10 @@ test('inline application script has valid JavaScript syntax', () => {
   assert.equal(scripts.length, 1);
   assert.doesNotThrow(() => new Function(scripts[0][1]));
 });
+
+test('capacity live region is limited to the status text', () => {
+  assert.match(html, /<div id="capacity-preview"><\/div>/);
+  assert.match(html, /class="capacity-status" role="status" aria-live="polite"/);
+  assert.doesNotMatch(html, /id="capacity-preview"[^>]*aria-live/);
+  assert.doesNotMatch(html, /id="capacity-preview"[^>]*aria-atomic/);
+});

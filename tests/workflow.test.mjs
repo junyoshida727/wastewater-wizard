@@ -18,7 +18,7 @@ test('branch check treats command substitution in a valid Git branch name as lit
 });
 
 test('branch check retains the existing acceptance and rejection rules', () => {
-  for (const [BRANCH, expected] of [['fix/example', 0], ['feature/example', 0], ['main', 1]]) {
+  for (const [BRANCH, expected] of [['fix/example', 0], ['feature/example', 0], ['codex/example', 0], ['main', 1]]) {
     assert.equal(spawnSync('bash', ['-c', script], { env: { ...process.env, BRANCH } }).status, expected);
   }
 });

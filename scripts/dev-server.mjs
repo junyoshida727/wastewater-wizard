@@ -16,7 +16,7 @@ const fail = (response, status) => {
 
 // Export the handler so error paths can also be exercised without opening a socket.
 export function createRequestHandler(root, openStream = createReadStream) {
-  const rootPath = realpath(root);
+  const rootPath = realpath(root).catch(error => error);
   return async (request, response) => {
     let pathname;
     try {
@@ -28,6 +28,7 @@ export function createRequestHandler(root, openStream = createReadStream) {
     }
     try {
       const base = await rootPath;
+      if (base instanceof Error) { fail(response, 500); return; }
       const file = resolve(base, '.' + (pathname === '/' ? '/index.html' : pathname));
       if (!contained(base, file)) { fail(response, 404); return; }
       const canonical = await realpath(file);
