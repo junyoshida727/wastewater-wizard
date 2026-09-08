@@ -13,6 +13,67 @@ function loadCore() {
 const core = loadCore();
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
+test('sales layout migration archives old page notes once and retains the original electrical capacity', () => {
+  const old = { step_notes1: '容量の相談\n納期未定', step_notes2: '薬品のメモ', step_notes3: '計器メモ', step_notes4: '既設ポンプ', notes: '搬入注意',
+    extra_pumps: [null, { name: '既設攪拌機', kind: '攪拌機', tank: '原水槽', count: '1', lph: '0.75', amp: '4.2' }] };
+  const snapshot = JSON.stringify(old);
+  const migrated = core.normalizeData(old);
+  assert.equal(JSON.stringify(old), snapshot);
+  for (let n = 1; n <= 4; n++) {
+    assert.equal(migrated[`step_notes${n}`], '');
+    assert.ok(migrated.legacy_notes.includes(old[`step_notes${n}`]));
+  }
+  assert.equal(migrated.notes, '搬入注意');
+  const item = core.getQuoteEquipment(migrated).find(r => r.key === 'extra:legacy-extra-1');
+  assert.equal(item.legacyPower, '0.75');
+  assert.equal(item.spec.power, '');
+  assert.equal(item.spec.amp, '4.2');
+  migrated.equipment_specs[item.key] = { maker: '既設メーカー' };
+  const restored = core.normalizeData(JSON.parse(JSON.stringify(migrated)));
+  assert.equal(core.getQuoteEquipment(restored).find(r => r.key === item.key).spec.amp, '4.2');
+  assert.deepEqual(plain(core.normalizeData(restored)), plain(restored));
+});
+
+test('equipment specifications follow their role when chemical order, vessels and extra rows change', () => {
+  const d = core.normalizeData({ chemicals: ['pH調整剤（酸）', '液体凝集剤'], option_tanks: ['中継槽'],
+    extra_pumps: [null, { name: '既設', count: '1' }] });
+  d.equipment_specs['chemical:液体凝集剤'] = { model: 'LIQ-01', amp: '0', power: '25', power_unit: 'W' };
+  d.equipment_specs['transfer:relay'] = { maker: '中継メーカー' };
+  d.equipment_specs['extra:legacy-extra-1'] = { model: 'EX-01' };
+  d.chemicals.reverse();
+  d.extra_pumps = d.extra_pumps.filter(Boolean);
+  let rows = core.getQuoteEquipment(core.normalizeData(JSON.parse(JSON.stringify(d))));
+  assert.equal(rows.find(r => r.key === 'chemical:液体凝集剤').spec.model, 'LIQ-01');
+  assert.equal(rows.find(r => r.key === 'extra:legacy-extra-1').spec.model, 'EX-01');
+  d.powder_feeder = '使用する';
+  d.option_tanks = [];
+  rows = core.getQuoteEquipment(d);
+  assert.ok(!rows.some(r => r.key === 'chemical:液体凝集剤' || r.key === 'transfer:relay'));
+  d.powder_feeder = '使用しない';
+  d.option_tanks = ['中継槽'];
+  assert.equal(core.getQuoteEquipment(d).find(r => r.key === 'transfer:relay').spec.maker, '中継メーカー');
+});
+
+test('new water analysis and zero electrical values round-trip without changing process calculations', () => {
+  const d = core.createInitialData();
+  const before = plain(core.calculateBatchCapacity(d));
+  d.water_components = ['全リン', 'リン酸態リン'];
+  d.metals = ['亜鉛(Zn)', 'マグネシウム(Mg)'];
+  d.water_analysis = { 全リン: { status: '含有確認', value: '0', unit: 'mg-P/L', date: '2026-09-08', source: '分析表', note: 'メモ' } };
+  d.equipment_specs = { 'transfer:raw': { maker: 'メーカー', model: 'A', amp: '0', power: '0', power_unit: 'W', frequency: '60Hz', note: '予備' } };
+  const restored = core.normalizeData(JSON.parse(JSON.stringify(d)));
+  assert.deepEqual(plain(core.calculateBatchCapacity(restored)), before);
+  assert.equal(restored.water_analysis.全リン.value, '0');
+  assert.equal(restored.equipment_specs['transfer:raw'].power, '0');
+  assert.equal(core.getWaterAnalysisNames(restored).filter(n => n === '亜鉛(Zn)').length, 1);
+  assert.ok(core.getWaterAnalysisNames(restored).includes('リン酸態リン'));
+  assert.equal(core.validateData(restored).errors.length, 0);
+  restored.equipment_specs['transfer:raw'].amp = '-1';
+  restored.water_analysis.全リン.value = '-0.1';
+  assert.ok(core.validateData(restored).errors.some(e => e.includes('定格電流')));
+  assert.ok(core.validateData(restored).errors.some(e => e.includes('分析値')));
+});
+
 test('legacy ambiguous hazardous value is migrated without claiming absence', () => {
   const data = core.normalizeData({ hazardous: ['なし'], wastewater_type: 'めっき洗浄水', ph_min: '2', ph_max: '5' });
   assert.deepEqual(plain(data.hazardous), ['なし/不明']);
