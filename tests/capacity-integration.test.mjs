@@ -117,6 +117,59 @@ test('real input handlers recalculate and persist conditions; result/PDF uses id
   assert.doesNotMatch(preview(), /capacity-metrics/);
 });
 
+test('sales fields and all five notes survive save/resume, print safely and reset for a new customer', () => {
+  const app = loadWizard();
+  app.run(`data.water_components = ['全リン']; data.metals = ['マグネシウム(Mg)'];
+    setSalesValue('water', '全リン', 'value', '0');
+    setSalesValue('water', '全リン', 'unit', 'mg-P/L');
+    setSalesValue('equipment', 'transfer:raw', 'maker', '<img src=x onerror=alert(1)>');
+    setSalesValue('equipment', 'transfer:raw', 'power', '0');
+    setSalesValue('equipment', 'transfer:raw', 'power_unit', 'W');
+    setSalesValue('equipment', 'transfer:raw', 'output_kw', '0.75');
+    setSalesValue('equipment', 'transfer:raw', 'amp', '4.2');
+    setSalesValue('equipment', 'transfer:raw', 'voltage', '200');
+    setSalesValue('equipment', 'transfer:raw', 'phase', '三相');
+    setSalesValue('equipment', 'transfer:raw', 'frequency', '60Hz');
+    setSalesValue('equipment', 'transfer:raw', 'note', '機器の備考');`);
+  for (const id of ['step_notes1', 'step_notes2', 'step_notes3', 'step_notes4', 'notes']) app.run(`updateData('${id}', '${id}の備考')`);
+  app.run('goStep(4)');
+  const restored = loadWizard(app.storage);
+  restored.run('loadFromLocalStorage(); resumeDraft(); generateResult()');
+  assert.equal(restored.run('currentStep'), 4);
+  const quote = restored.elements.get('result-quote-equipment').innerHTML;
+  assert.match(quote, /0 W／台/);
+  assert.match(quote, /定格出力：0.75 kW／台/);
+  assert.match(quote, /定格電流：4.2 A／台/);
+  assert.match(quote, /電圧：200 V/);
+  assert.match(quote, /相数：三相/);
+  assert.match(quote, /周波数：60Hz/);
+  assert.match(quote, /&lt;img/);
+  assert.doesNotMatch(quote, /<img/);
+  assert.match(quote, /機器の備考/);
+  assert.match(restored.elements.get('result-water-analysis').innerHTML, /0 mg-P\/L/);
+  assert.doesNotMatch(restored.elements.get('result-notes').innerHTML, /重金属は凝集沈殿槽内/);
+  for (const id of ['step_notes1', 'step_notes2', 'step_notes3', 'step_notes4', 'notes']) assert.match(restored.table.innerHTML, new RegExp(id + 'の備考'));
+  restored.run('startNewDraft(true); generateResult()');
+  assert.doesNotMatch(restored.elements.get('result-quote-equipment').innerHTML, /&lt;img|機器の備考/);
+  assert.doesNotMatch(restored.elements.get('result-water-analysis').innerHTML, /mg-P\/L/);
+});
+
+test('old draft opens on page one and preserves a snapshot and correctly labelled notes', () => {
+  const storage = new Map([['ww-drafts-v2', JSON.stringify([{ id: 'legacy-sales', version: 2, step: 4, savedAt: Date.now(),
+    data: { customer_name: '旧案件', step_notes1: '排水量の相談', step_notes4: '既設仕様', notes: '現場条件' } }])]]);
+  const app = loadWizard(storage);
+  app.run('loadFromLocalStorage(); resumeDraft(); generateResult()');
+  assert.equal(app.run('currentStep'), 1);
+  assert.match(app.table.innerHTML, /旧STEP1（基本情報）/);
+  assert.match(app.table.innerHTML, /旧STEP4（既存設備）/);
+  assert.equal(app.run('data.step_notes4'), '');
+  const saved = JSON.parse(storage.get('ww-drafts-v2'))[0];
+  assert.equal(saved.legacySnapshot.data.step_notes4, '既設仕様');
+  assert.equal(saved.legacySnapshot.step, 4);
+  app.run('saveToLocalStorage()');
+  assert.equal(JSON.parse(storage.get('ww-drafts-v2'))[0].legacySnapshot.data.customer_name, '旧案件');
+});
+
 test('draft reload, resume and new-project reset retain or clear capacity conditions correctly', () => {
   const first = loadWizard();
   first.fillCapacity();

@@ -130,6 +130,7 @@
   .form-area {
     padding: 40px 48px;
     overflow-y: auto;
+    min-width: 0;
   }
 
   .step-panel { display: none; }
@@ -1271,6 +1272,35 @@
     line-height: 1.5;
   }
   .tooltip-wrap:hover .tooltip-text { display: block; }
+  .form-section-title { font-size: 15px; margin: 24px 0 12px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .sales-detail { border-bottom: 1px solid var(--border); padding: 12px 0; min-width: 0; }
+  .sales-detail summary { cursor: pointer; font-size: 14px; overflow-wrap: anywhere; }
+  .sales-detail summary span { display: block; margin: 5px 0 0 16px; color: var(--text2); font-size: 12px; }
+  .sales-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+  .sales-fields label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text2); min-width: 0; }
+  .sales-fields input, .sales-fields select, .sales-fields textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+  .sales-fields .wide { grid-column: 1 / -1; }
+  .inline-add { display: flex; gap: 8px; margin-top: 12px; }
+  .inline-add input { min-width: 0; flex: 1; }
+  .inline-add button { flex: none; }
+  .legacy-note { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.7; }
+  .quote-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+  .quote-table th, .quote-table td { text-align: left; vertical-align: top; padding: 9px; border: 1px solid var(--border); overflow-wrap: anywhere; white-space: pre-line; }
+  .quote-table th { background: var(--surface2); }
+  .data-table .data-section th { text-align: left; padding: 14px 12px; background: var(--surface2); }
+  @media (max-width: 600px) {
+    .sales-fields { grid-template-columns: minmax(0, 1fr); }
+    .inline-add { flex-wrap: wrap; }
+    .quote-table { font-size: 11px; }
+    .quote-table th, .quote-table td { padding: 5px; }
+  }
+  @media print {
+    .quote-table { color: #111; font-size: 9pt; }
+    .quote-table th, .quote-table td { border-color: #bbb; }
+    .quote-table th, .data-table .data-section th { background: #eee !important; color: #111 !important; }
+    .quote-table tr { break-inside: avoid; }
+    .quote-table thead { display: table-header-group; }
+  }
 </style>
 <script src="wizard-core.js"></script>
 <script src="wizard-flow.js"></script>
@@ -1311,19 +1341,19 @@
     </div>
     <div class="step-nav-item" data-step="2" onclick="goStep(2)">
       <div class="step-num">2</div>
-      <div class="step-label">水質情報</div>
+      <div class="step-label">排水・水質</div>
     </div>
     <div class="step-nav-item" data-step="3" onclick="goStep(3)">
       <div class="step-num">3</div>
-      <div class="step-label">装置オプション</div>
+      <div class="step-label">装置構成</div>
     </div>
     <div class="step-nav-item" data-step="4" onclick="goStep(4)">
       <div class="step-num">4</div>
-      <div class="step-label">既存設備</div>
+      <div class="step-label">機器仕様</div>
     </div>
     <div class="step-nav-item" data-step="5" onclick="goStep(5)">
       <div class="step-num">5</div>
-      <div class="step-label">現場・施工条件</div>
+      <div class="step-label">設備・現場</div>
     </div>
   </nav>
 
@@ -1333,9 +1363,8 @@
     <!-- STEP 1 -->
     <div class="step-panel active" id="step1">
       <div class="step-header">
-        <div class="step-tag">STEP 01 — BASIC INFO</div>
+        <div class="step-tag">STEP 01 / BASIC INFO</div>
         <div class="step-title">基本情報</div>
-        <div class="step-desc">顧客の業種と排水の発生状況を確認します</div>
       </div>
 
       <div class="field-group">
@@ -1422,6 +1451,28 @@
       </div>
 
       <div class="field-group">
+        <div class="field-label">備考・特記事項</div>
+        <textarea id="step_notes1" rows="2" placeholder="基本情報に関するメモや補足事項" oninput="updateData('step_notes1', this.value)" style="resize:vertical;"></textarea>
+        <details id="legacy-notes-section" hidden>
+          <summary>旧下書きの備考</summary>
+          <div id="legacy-notes" class="legacy-note"></div>
+        </details>
+      </div>
+
+      <div class="nav-buttons">
+
+        <button class="btn btn-primary" onclick="goStep(2)">次へ →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step-panel" id="step2">
+      <div class="step-header">
+        <div class="step-tag">STEP 02 / WASTEWATER</div>
+        <div class="step-title">排水・水質情報</div>
+      </div>
+
+      <div class="field-group">
         <div class="field-label">排水の種類・内容</div>
         <select id="wastewater_type_select" onchange="selectWastewaterType(this.value)" style="margin-bottom:8px; width:100%;">
           <option value="">業種を選択すると候補が表示されます</option>
@@ -1448,97 +1499,6 @@
           <input type="number" id="working_days" placeholder="例: 20" min="1" max="31" oninput="updateData('working_days', this.value)">
           <span class="unit">日/月</span>
         </div>
-      </div>
-
-      <div class="field-group">
-        <div class="field-label">1日のバッチ回数</div>
-        <div class="radio-grid" id="batch_count">
-          <div class="radio-item" onclick="selectRadio('batch_count', '1回', this)">1回</div>
-          <div class="radio-item" onclick="selectRadio('batch_count', '2〜3回', this)">2〜3回</div>
-          <div class="radio-item" onclick="selectRadio('batch_count', '4回以上', this)">4回以上</div>
-          <div class="radio-item" onclick="selectRadio('batch_count', '不定期', this)">不定期</div>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <div class="field-label">排水処理装置の容量</div>
-        <div class="radio-grid" id="tank_capacity" style="grid-template-columns:repeat(3,1fr);">
-          <div class="radio-item" onclick="selectRadio('tank_capacity', '200L', this)">200L</div>
-          <div class="radio-item" onclick="selectRadio('tank_capacity', '500L', this)">500L</div>
-          <div class="radio-item" onclick="selectRadio('tank_capacity', '1000L', this)">1000L</div>
-        </div>
-      </div>
-
-      <section class="capacity-section" aria-labelledby="capacity-heading">
-        <h3 id="capacity-heading">バッチ処理能力の概算チェック</h3>
-        <p class="capacity-help">上の排水量・装置容量と、以下の運転条件から日処理能力を確認します。任意入力です。条件が不明な場合は空欄にしてください。</p>
-        <div class="capacity-inputs">
-          <div>
-            <label class="field-label" for="operating_hours">運転可能時間</label>
-            <div class="input-with-unit">
-              <input type="number" id="operating_hours" min="0" max="24" step="any" placeholder="例: 8" aria-describedby="capacity-conditions-help" oninput="updateData('operating_hours', this.value)">
-              <span class="unit">時間/日</span>
-            </div>
-          </div>
-          <div>
-            <label class="field-label" for="batch_cycle_minutes">1バッチの所要時間</label>
-            <div class="input-with-unit">
-              <input type="number" id="batch_cycle_minutes" min="0" step="any" placeholder="例: 90" aria-describedby="capacity-conditions-help" oninput="updateData('batch_cycle_minutes', this.value)">
-              <span class="unit">分/回</span>
-            </div>
-          </div>
-          <div>
-            <label class="field-label" for="working_volume_percent">容量の有効使用率</label>
-            <div class="input-with-unit">
-              <input type="number" id="working_volume_percent" min="0" max="100" step="any" placeholder="例: 80" aria-describedby="capacity-conditions-help" oninput="updateData('working_volume_percent', this.value)">
-              <span class="unit">%</span>
-            </div>
-          </div>
-        </div>
-        <p class="capacity-help" id="capacity-conditions-help">運転可能時間は休止・保守時間を除いた時間、所要時間は給水・反応・沈殿・排水・汚泥排出など次のバッチ開始までの全工程を入力。有効使用率は、装置容量のうち1回に受け入れられる原水量の割合です。メーカー仕様・試験結果等をもとに設定してください。入力例は推奨値ではありません。</p>
-        <div id="capacity-preview"></div>
-      </section>
-
-      <div class="field-group">
-        <div class="field-label">ろ過分岐数</div>
-        <div style="font-size:11px; color:var(--text3); margin-bottom:8px;">基本構成：200Lは2分岐、500Lは3分岐、1000Lは5分岐。選択した分岐数のカゴを、図面のろ過受け槽内に表示します（分岐なしは1個）。</div>
-        <div class="radio-grid" id="filter_branches" style="grid-template-columns:repeat(3,1fr);">
-          <div class="radio-item" onclick="selectRadio('filter_branches', '分岐なし', this)">分岐なし</div>
-          <div class="radio-item" onclick="selectRadio('filter_branches', '2分岐', this)">2分岐</div>
-          <div class="radio-item" onclick="selectRadio('filter_branches', '3分岐', this)">3分岐</div>
-          <div class="radio-item" onclick="selectRadio('filter_branches', '4分岐', this)">4分岐</div>
-          <div class="radio-item" onclick="selectRadio('filter_branches', '5分岐', this)">5分岐</div>
-          <div class="radio-item" onclick="selectRadio('filter_branches', 'ろ過しない', this)">ろ過しない</div>
-          <div class="radio-item" onclick="selectRadio('filter_branches', '不明', this)">不明</div>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <div class="field-label">粉体供給機の使用</div>
-        <div style="font-size:11px; color:var(--text3); margin-bottom:8px;">粉末一剤型凝集剤（アクアネイチャー等）を使用する場合に選択</div>
-        <div class="radio-grid" id="powder_feeder" style="grid-template-columns:repeat(3,1fr);">
-          <div class="radio-item" onclick="selectRadio('powder_feeder', '使用する', this)">使用する</div>
-          <div class="radio-item" onclick="selectRadio('powder_feeder', '使用しない', this)">使用しない</div>
-          <div class="radio-item" onclick="selectRadio('powder_feeder', '未定', this)">未定</div>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <div class="field-label">備考・特記事項</div>
-        <textarea id="step_notes1" rows="2" placeholder="このステップに関するメモや補足事項" oninput="updateData('step_notes1', this.value)" style="resize:vertical;"></textarea>
-      </div>
-
-      <div class="nav-buttons">
-        <button class="btn btn-primary" onclick="goStep(2)">次へ →</button>
-      </div>
-    </div>
-
-    <!-- STEP 2 -->
-    <div class="step-panel" id="step2">
-      <div class="step-header">
-        <div class="step-tag">STEP 02 — WATER QUALITY</div>
-        <div class="step-title">水質情報</div>
-        <div class="step-desc">処理フローの決定に最も重要なステップです</div>
       </div>
 
       <div class="field-group">
@@ -1572,7 +1532,7 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">含まれる重金属（複数選択可）</div>
+        <div class="field-label">金属・無機成分（複数選択可）</div>
         <div class="check-grid" id="metals">
           <div class="check-item" onclick="toggleCheck('metals', 'クロム(Cr)', this)"><div class="check-box"></div>クロム (Cr)</div>
           <div class="check-item" onclick="toggleCheck('metals', 'ニッケル(Ni)', this)"><div class="check-box"></div>ニッケル (Ni)</div>
@@ -1580,6 +1540,11 @@
           <div class="check-item" onclick="toggleCheck('metals', '亜鉛(Zn)', this)"><div class="check-box"></div>亜鉛 (Zn)</div>
           <div class="check-item" onclick="toggleCheck('metals', '鉛(Pb)', this)"><div class="check-box"></div>鉛 (Pb)</div>
           <div class="check-item" onclick="toggleCheck('metals', 'ヒ素(As)', this)"><div class="check-box"></div>ヒ素 (As)</div>
+          <div class="check-item" onclick="toggleCheck('metals', 'マグネシウム(Mg)', this)"><div class="check-box"></div>マグネシウム (Mg)</div>
+          <div class="check-item" onclick="toggleCheck('metals', 'カルシウム(Ca)', this)"><div class="check-box"></div>カルシウム (Ca)</div>
+          <div class="check-item" onclick="toggleCheck('metals', '鉄(Fe)', this)"><div class="check-box"></div>鉄 (Fe)</div>
+          <div class="check-item" onclick="toggleCheck('metals', 'マンガン(Mn)', this)"><div class="check-box"></div>マンガン (Mn)</div>
+          <div class="check-item" onclick="toggleCheck('metals', 'アルミニウム(Al)', this)"><div class="check-box"></div>アルミニウム (Al)</div>
           <div class="check-item" onclick="toggleCheck('metals', 'なし', this)"><div class="check-box"></div>含まない</div>
         </div>
       </div>
@@ -1590,6 +1555,10 @@
           <div class="check-item" onclick="toggleCheck('hazardous', 'シアン(CN)', this)"><div class="check-box"></div>シアン (CN)</div>
           <div class="check-item" onclick="toggleCheck('hazardous', 'フッ素(F)', this)"><div class="check-box"></div>フッ素 (F)</div>
           <div class="check-item" onclick="toggleCheck('hazardous', '六価クロム(Cr6+)', this)"><div class="check-box"></div>六価クロム (Cr⁶⁺)</div>
+          <div class="check-item" onclick="toggleCheck('hazardous', 'ほう素(B)', this)"><div class="check-box"></div>ほう素 (B)</div>
+          <div class="check-item" onclick="toggleCheck('hazardous', 'カドミウム(Cd)', this)"><div class="check-box"></div>カドミウム (Cd)</div>
+          <div class="check-item" onclick="toggleCheck('hazardous', '水銀(Hg)', this)"><div class="check-box"></div>水銀 (Hg)</div>
+          <div class="check-item" onclick="toggleCheck('hazardous', 'セレン(Se)', this)"><div class="check-box"></div>セレン (Se)</div>
           <div class="check-item" onclick="toggleCheck('hazardous', 'なし/不明', this)"><div class="check-box"></div>なし/不明</div>
         </div>
       </div>
@@ -1601,6 +1570,89 @@
           <div class="check-item" onclick="toggleCheck('other_contam', 'SS多い', this)"><div class="check-box"></div>SS多い（濁り強い）</div>
           <div class="check-item" onclick="toggleCheck('other_contam', 'BOD/COD高い', this)"><div class="check-box"></div>BOD/COD高い</div>
           <div class="check-item" onclick="toggleCheck('other_contam', 'なし/不明', this)"><div class="check-box"></div>なし/不明</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">栄養塩類・その他の成分</div>
+        <div class="check-grid" id="water_components">
+          <div class="check-item" onclick="toggleCheck('water_components', '全リン', this)"><div class="check-box"></div>全リン</div>
+          <div class="check-item" onclick="toggleCheck('water_components', 'リン酸態リン', this)"><div class="check-box"></div>リン酸態リン</div>
+          <div class="check-item" onclick="toggleCheck('water_components', '全窒素', this)"><div class="check-box"></div>全窒素</div>
+          <div class="check-item" onclick="toggleCheck('water_components', 'アンモニア性窒素', this)"><div class="check-box"></div>アンモニア性窒素</div>
+          <div class="check-item" onclick="toggleCheck('water_components', '界面活性剤', this)"><div class="check-box"></div>界面活性剤</div>
+          <div class="check-item" onclick="toggleCheck('water_components', '溶剤', this)"><div class="check-box"></div>溶剤</div>
+          <div class="check-item" onclick="toggleCheck('water_components', '塩類', this)"><div class="check-box"></div>塩類</div>
+        </div>
+        <div class="inline-add">
+          <input id="custom-water-name" type="text" aria-label="その他の水質項目名" placeholder="その他の成分名">
+          <button type="button" class="btn btn-secondary" onclick="addWaterComponent()">項目を追加</button>
+        </div>
+        <div id="custom-water-components"></div>
+      </div>
+
+      <div class="field-group">
+        <h3 class="form-section-title">分析値・確認状況（任意）</h3>
+        <div id="water-analysis-fields"></div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">放流先</div>
+        <div class="radio-grid" id="discharge_dest">
+          <div class="radio-item" onclick="selectRadio('discharge_dest', '公共下水道', this); updateFlowPreview()">公共下水道</div>
+          <div class="radio-item" onclick="selectRadio('discharge_dest', '河川・湖沼', this); updateFlowPreview()">河川・湖沼</div>
+          <div class="radio-item" onclick="selectRadio('discharge_dest', '海域', this); updateFlowPreview()">海域</div>
+          <div class="radio-item" onclick="selectRadio('discharge_dest', '不明', this); updateFlowPreview()">不明</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">排水基準の把握状況</div>
+        <div class="radio-grid" id="regulation_status">
+          <div class="radio-item" onclick="selectRadio('regulation_status', '把握済み', this)">把握済み</div>
+          <div class="radio-item" onclick="selectRadio('regulation_status', '概ね把握', this)">概ね把握</div>
+          <div class="radio-item" onclick="selectRadio('regulation_status', '不明', this)">不明</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">備考・特記事項</div>
+        <textarea id="step_notes2" rows="2" placeholder="排水・水質に関するメモや補足事項" oninput="updateData('step_notes2', this.value)" style="resize:vertical;"></textarea>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-secondary" onclick="goStep(1)">← 戻る</button>
+        <button class="btn btn-primary" onclick="goStep(3)">次へ →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step-panel" id="step3">
+      <div class="step-header">
+        <div class="step-tag">STEP 03 / PROCESS</div>
+        <div class="step-title">装置構成・運転条件</div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">排水処理装置の容量</div>
+        <div class="radio-grid" id="tank_capacity" style="grid-template-columns:repeat(3,1fr);">
+          <div class="radio-item" onclick="selectRadio('tank_capacity', '200L', this)">200L</div>
+          <div class="radio-item" onclick="selectRadio('tank_capacity', '500L', this)">500L</div>
+          <div class="radio-item" onclick="selectRadio('tank_capacity', '1000L', this)">1000L</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">ろ過分岐数</div>
+        <div style="font-size:11px; color:var(--text3); margin-bottom:8px;">基本構成：200Lは2分岐、500Lは3分岐、1000Lは5分岐。選択した分岐数のカゴを、図面のろ過受け槽内に表示します（分岐なしは1個）。</div>
+        <div class="radio-grid" id="filter_branches" style="grid-template-columns:repeat(3,1fr);">
+          <div class="radio-item" onclick="selectRadio('filter_branches', '分岐なし', this)">分岐なし</div>
+          <div class="radio-item" onclick="selectRadio('filter_branches', '2分岐', this)">2分岐</div>
+          <div class="radio-item" onclick="selectRadio('filter_branches', '3分岐', this)">3分岐</div>
+          <div class="radio-item" onclick="selectRadio('filter_branches', '4分岐', this)">4分岐</div>
+          <div class="radio-item" onclick="selectRadio('filter_branches', '5分岐', this)">5分岐</div>
+          <div class="radio-item" onclick="selectRadio('filter_branches', 'ろ過しない', this)">ろ過しない</div>
+          <div class="radio-item" onclick="selectRadio('filter_branches', '不明', this)">不明</div>
         </div>
       </div>
 
@@ -1647,41 +1699,13 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">放流先</div>
-        <div class="radio-grid" id="discharge_dest">
-          <div class="radio-item" onclick="selectRadio('discharge_dest', '公共下水道', this); updateFlowPreview()">公共下水道</div>
-          <div class="radio-item" onclick="selectRadio('discharge_dest', '河川・湖沼', this); updateFlowPreview()">河川・湖沼</div>
-          <div class="radio-item" onclick="selectRadio('discharge_dest', '海域', this); updateFlowPreview()">海域</div>
-          <div class="radio-item" onclick="selectRadio('discharge_dest', '不明', this); updateFlowPreview()">不明</div>
+        <div class="field-label">粉体供給機の使用</div>
+        <div style="font-size:11px; color:var(--text3); margin-bottom:8px;">粉末一剤型凝集剤（アクアネイチャー等）を使用する場合に選択</div>
+        <div class="radio-grid" id="powder_feeder" style="grid-template-columns:repeat(3,1fr);">
+          <div class="radio-item" onclick="selectRadio('powder_feeder', '使用する', this)">使用する</div>
+          <div class="radio-item" onclick="selectRadio('powder_feeder', '使用しない', this)">使用しない</div>
+          <div class="radio-item" onclick="selectRadio('powder_feeder', '未定', this)">未定</div>
         </div>
-      </div>
-
-      <div class="field-group">
-        <div class="field-label">排水基準の把握状況</div>
-        <div class="radio-grid" id="regulation_status">
-          <div class="radio-item" onclick="selectRadio('regulation_status', '把握済み', this)">把握済み</div>
-          <div class="radio-item" onclick="selectRadio('regulation_status', '概ね把握', this)">概ね把握</div>
-          <div class="radio-item" onclick="selectRadio('regulation_status', '不明', this)">不明</div>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <div class="field-label">備考・特記事項</div>
-        <textarea id="step_notes2" rows="2" placeholder="このステップに関するメモや補足事項" oninput="updateData('step_notes2', this.value)" style="resize:vertical;"></textarea>
-      </div>
-
-      <div class="nav-buttons">
-        <button class="btn btn-secondary" onclick="goStep(1)">← 戻る</button>
-        <button class="btn btn-primary" onclick="goStep(3)">次へ →</button>
-      </div>
-    </div>
-
-    <!-- STEP 3 -->
-    <div class="step-panel" id="step3">
-      <div class="step-header">
-        <div class="step-tag">STEP 03 — EQUIPMENT OPTIONS</div>
-        <div class="step-title">装置オプション</div>
-        <div class="step-desc">標準仕様に追加するオプション機器を選択してください</div>
       </div>
 
       <div class="field-group">
@@ -1692,6 +1716,77 @@
           <div class="check-item" onclick="toggleCheck('option_tanks', '汚泥貯槽', this)"><div class="check-box"></div>汚泥貯槽</div>
           <div class="check-item" onclick="toggleCheck('option_tanks', '監視槽', this)"><div class="check-box"></div>監視槽</div>
         </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">脱水機</div>
+        <div class="radio-grid" id="option_dehydrator">
+          <div class="radio-item" onclick="selectRadio('option_dehydrator', '必要', this); toggleDehydratorDetail(true)">必要</div>
+          <div class="radio-item" onclick="selectRadio('option_dehydrator', '不要', this); toggleDehydratorDetail(false)">不要</div>
+          <div class="radio-item" onclick="selectRadio('option_dehydrator', '未定', this); toggleDehydratorDetail(false)">未定</div>
+        </div>
+        <div id="dehydrator-detail" style="display:none;" hidden>
+          <input type="hidden" id="dehydrator_maker">
+          <input type="hidden" id="dehydrator_model">
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">1日のバッチ回数</div>
+        <div class="radio-grid" id="batch_count">
+          <div class="radio-item" onclick="selectRadio('batch_count', '1回', this)">1回</div>
+          <div class="radio-item" onclick="selectRadio('batch_count', '2〜3回', this)">2〜3回</div>
+          <div class="radio-item" onclick="selectRadio('batch_count', '4回以上', this)">4回以上</div>
+          <div class="radio-item" onclick="selectRadio('batch_count', '不定期', this)">不定期</div>
+        </div>
+      </div>
+
+      <section class="capacity-section" aria-labelledby="capacity-heading">
+        <h3 id="capacity-heading">バッチ処理能力の概算チェック</h3>
+        <p class="capacity-help">1日の排水量：<strong id="capacity-daily-volume">未入力</strong></p>
+        <div class="capacity-inputs">
+          <div>
+            <label class="field-label" for="operating_hours">運転可能時間</label>
+            <div class="input-with-unit">
+              <input type="number" id="operating_hours" min="0" max="24" step="any" placeholder="例: 8" aria-describedby="capacity-conditions-help" oninput="updateData('operating_hours', this.value)">
+              <span class="unit">時間/日</span>
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="batch_cycle_minutes">1バッチの所要時間</label>
+            <div class="input-with-unit">
+              <input type="number" id="batch_cycle_minutes" min="0" step="any" placeholder="例: 90" aria-describedby="capacity-conditions-help" oninput="updateData('batch_cycle_minutes', this.value)">
+              <span class="unit">分/回</span>
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="working_volume_percent">容量の有効使用率</label>
+            <div class="input-with-unit">
+              <input type="number" id="working_volume_percent" min="0" max="100" step="any" placeholder="例: 80" aria-describedby="capacity-conditions-help" oninput="updateData('working_volume_percent', this.value)">
+              <span class="unit">%</span>
+            </div>
+          </div>
+        </div>
+        <p class="capacity-help" id="capacity-conditions-help">運転可能時間は休止・保守時間を除いた時間、所要時間は給水・反応・沈殿・排水・汚泥排出など次のバッチ開始までの全工程を入力。有効使用率は、装置容量のうち1回に受け入れられる原水量の割合です。メーカー仕様・試験結果等をもとに設定してください。入力例は推奨値ではありません。</p>
+        <div id="capacity-preview"></div>
+      </section>
+
+      <div class="field-group">
+        <div class="field-label">備考・特記事項</div>
+        <textarea id="step_notes3" rows="2" placeholder="装置構成・運転条件に関するメモや補足事項" oninput="updateData('step_notes3', this.value)" style="resize:vertical;"></textarea>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-secondary" onclick="goStep(2)">← 戻る</button>
+        <button class="btn btn-primary" onclick="goStep(4)">次へ →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step-panel" id="step4">
+      <div class="step-header">
+        <div class="step-tag">STEP 04 / EQUIPMENT</div>
+        <div class="step-title">機器仕様</div>
       </div>
 
       <div class="field-group">
@@ -1712,96 +1807,6 @@
           <div class="check-item" onclick="toggleCheck('option_turbidity_tanks', '汚泥貯槽', this)"><div class="check-box"></div>汚泥貯槽</div>
           <div class="check-item" onclick="toggleCheck('option_turbidity_tanks', '監視槽', this)"><div class="check-box"></div>監視槽</div>
         </div>
-      </div>
-
-      <div class="field-group">
-        <div class="field-label">脱水機</div>
-        <div class="radio-grid" id="option_dehydrator">
-          <div class="radio-item" onclick="selectRadio('option_dehydrator', '必要', this); toggleDehydratorDetail(true)">必要</div>
-          <div class="radio-item" onclick="selectRadio('option_dehydrator', '不要', this); toggleDehydratorDetail(false)">不要</div>
-          <div class="radio-item" onclick="selectRadio('option_dehydrator', '未定', this); toggleDehydratorDetail(false)">未定</div>
-        </div>
-        <div id="dehydrator-detail" style="display:none; margin-top:10px; display:none;">
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-            <div>
-              <div style="font-size:12px; color:var(--text2); margin-bottom:4px;">メーカー</div>
-              <input type="text" id="dehydrator_maker" placeholder="例：荏原製作所" oninput="updateData('dehydrator_maker', this.value)">
-            </div>
-            <div>
-              <div style="font-size:12px; color:var(--text2); margin-bottom:4px;">型番</div>
-              <input type="text" id="dehydrator_model" placeholder="例：TYPE-100" oninput="updateData('dehydrator_model', this.value)">
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <div class="field-label">備考・特記事項</div>
-        <textarea id="step_notes3" rows="2" placeholder="このステップに関するメモや補足事項" oninput="updateData('step_notes3', this.value)" style="resize:vertical;"></textarea>
-      </div>
-
-      <div class="nav-buttons">
-        <button class="btn btn-secondary" onclick="goStep(2)">← 戻る</button>
-        <button class="btn btn-primary" onclick="goStep(4)">次へ →</button>
-      </div>
-    </div>
-
-    <!-- STEP 4 -->
-    <div class="step-panel" id="step4">
-      <div class="step-header">
-        <div class="step-tag">STEP 04 — EXISTING FACILITY</div>
-        <div class="step-title">既存設備</div>
-        <div class="step-desc">現在の設備状況を確認します</div>
-      </div>
-
-      <div class="field-group">
-        <div class="field-label">原水槽の有無</div>
-        <div class="radio-grid" id="raw_tank">
-          <div class="radio-item" onclick="selectRadio('raw_tank', 'あり', this)">あり</div>
-          <div class="radio-item" onclick="selectRadio('raw_tank', 'なし', this)">なし（新設必要）</div>
-          <div class="radio-item" onclick="selectRadio('raw_tank', '不明', this)">不明</div>
-        </div>
-      </div>
-
-      <div class="field-group" id="raw_tank_size_group">
-        <div class="field-label">原水槽のサイズ（あり の場合）</div>
-        <div class="input-with-unit">
-          <input type="number" id="raw_tank_size" placeholder="例: 3" min="0" oninput="updateData('raw_tank_size', this.value)">
-          <span class="unit">m³</span>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <div class="field-label">電源容量の把握状況</div>
-        <div class="radio-grid" id="power_status">
-          <div class="radio-item" onclick="selectRadio('power_status', '把握済み', this)">把握済み</div>
-          <div class="radio-item" onclick="selectRadio('power_status', '要確認', this)">要確認</div>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <div class="field-label">追加ポンプ・攪拌機（標準付属以外）</div>
-        <div style="font-size:11px; color:var(--text3); margin-bottom:10px;">制御盤と連動が必要な機器を入力してください。既設の攪拌機・ポンプも含みます（原水移送ポンプ1台は標準付属。中継槽ありの場合は、原水槽→中継槽と中継槽→凝集沈殿槽の計2台を図示し、中継槽側の1台を追加分とします）</div>
-        <p class="equipment-help">設置槽を選ぶとフロー図の槽内に追加機器を表示します。台数は記号に併記します。追加ポンプの吐出先・配管接続は別途確認してください。図示済みの移送ポンプはここへの重複入力は不要です。</p>
-        <div style="overflow-x:auto;">
-        <table style="width:100%; min-width:540px; border-collapse:collapse; font-size:13px;" id="extra-pump-table">
-          <thead>
-            <tr style="border-bottom:1px solid var(--border); color:var(--text2);">
-              <th style="text-align:left; padding:6px 4px; font-weight:500;">機器名・種別・設置槽</th>
-              <th style="text-align:center; padding:6px 4px; font-weight:500;">台数</th>
-              <th style="text-align:center; padding:6px 4px; font-weight:500;">容量(kW)</th>
-              <th style="text-align:center; padding:6px 4px; font-weight:500;">定格電流(A)</th>
-              <th style="padding:4px;"></th>
-            </tr>
-          </thead>
-          <tbody id="extra-pump-rows">
-            <tr id="extra-pump-empty" style="color:var(--text3); font-size:12px;">
-              <td colspan="5" style="padding:12px 4px; text-align:center;">「＋機器を追加」から入力してください</td>
-            </tr>
-          </tbody>
-        </table>
-        </div>
-        <button type="button" onclick="addPumpRow()" style="margin-top:10px; padding:6px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:6px; color:var(--accent); font-size:12px; cursor:pointer;">＋ 機器を追加</button>
       </div>
 
       <div class="field-group">
@@ -1839,8 +1844,36 @@
       </div>
 
       <div class="field-group">
+        <div class="field-label">追加ポンプ・攪拌機（標準付属以外）</div>
+        <div style="font-size:11px; color:var(--text3); margin-bottom:10px;">制御盤と連動が必要な機器を入力してください。既設の攪拌機・ポンプも含みます（原水移送ポンプ1台は標準付属。中継槽ありの場合は、原水槽→中継槽と中継槽→凝集沈殿槽の計2台を図示し、中継槽側の1台を追加分とします）</div>
+        <p class="equipment-help">設置槽を選ぶとフロー図の槽内に追加機器を表示します。台数は記号に併記します。追加ポンプの吐出先・配管接続は別途確認してください。図示済みの移送ポンプはここへの重複入力は不要です。</p>
+        <div style="overflow-x:auto;">
+        <table style="width:100%; min-width:320px; border-collapse:collapse; font-size:13px;" id="extra-pump-table">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border); color:var(--text2);">
+              <th style="text-align:left; padding:6px 4px; font-weight:500;">機器名・種別・設置槽</th>
+              <th style="text-align:center; padding:6px 4px; font-weight:500;">台数</th>
+              <th style="padding:4px;"></th>
+            </tr>
+          </thead>
+          <tbody id="extra-pump-rows">
+            <tr id="extra-pump-empty" style="color:var(--text3); font-size:12px;">
+              <td colspan="3" style="padding:12px 4px; text-align:center;">「＋機器を追加」から入力してください</td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+        <button type="button" onclick="addPumpRow()" style="margin-top:10px; padding:6px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:6px; color:var(--accent); font-size:12px; cursor:pointer;">＋ 機器を追加</button>
+      </div>
+
+      <section aria-labelledby="quote-equipment-heading">
+        <h3 class="form-section-title" id="quote-equipment-heading">メーカー・型番・電気定格</h3>
+        <div id="quote-equipment-fields"></div>
+      </section>
+
+      <div class="field-group">
         <div class="field-label">備考・特記事項</div>
-        <textarea id="step_notes4" rows="2" placeholder="このステップに関するメモや補足事項" oninput="updateData('step_notes4', this.value)" style="resize:vertical;"></textarea>
+        <textarea id="step_notes4" rows="2" placeholder="機器仕様に関するメモや補足事項" oninput="updateData('step_notes4', this.value)" style="resize:vertical;"></textarea>
       </div>
 
       <div class="nav-buttons">
@@ -1852,9 +1885,33 @@
     <!-- STEP 5 -->
     <div class="step-panel" id="step5">
       <div class="step-header">
-        <div class="step-tag">STEP 05 — SITE CONDITIONS</div>
-        <div class="step-title">現場・施工条件</div>
-        <div class="step-desc">搬入・据付に関わる現場情報を確認します</div>
+        <div class="step-tag">STEP 05 / SITE CONDITIONS</div>
+        <div class="step-title">既存設備・現場条件</div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">原水槽の有無</div>
+        <div class="radio-grid" id="raw_tank">
+          <div class="radio-item" onclick="selectRadio('raw_tank', 'あり', this)">あり</div>
+          <div class="radio-item" onclick="selectRadio('raw_tank', 'なし', this)">なし（新設必要）</div>
+          <div class="radio-item" onclick="selectRadio('raw_tank', '不明', this)">不明</div>
+        </div>
+      </div>
+
+      <div class="field-group" id="raw_tank_size_group">
+        <div class="field-label">原水槽のサイズ（あり の場合）</div>
+        <div class="input-with-unit">
+          <input type="number" id="raw_tank_size" placeholder="例: 3" min="0" oninput="updateData('raw_tank_size', this.value)">
+          <span class="unit">m³</span>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">電源容量の把握状況</div>
+        <div class="radio-grid" id="power_status">
+          <div class="radio-item" onclick="selectRadio('power_status', '把握済み', this)">把握済み</div>
+          <div class="radio-item" onclick="selectRadio('power_status', '要確認', this)">要確認</div>
+        </div>
       </div>
 
       <div class="field-group">
@@ -1941,9 +1998,10 @@
 
       <div class="nav-buttons">
         <button class="btn btn-secondary" onclick="goStep(4)">← 戻る</button>
-        <button class="btn btn-generate" onclick="generateResult()">📋 ヒアリングシートを作成</button>
+        <button class="btn btn-generate" onclick="generateResult()">ヒアリングシートを作成</button>
       </div>
     </div>
+
   </div>
 
   <!-- Preview Panel -->
@@ -2040,6 +2098,15 @@
       </table>
     </div>
 
+    <section class="data-table-section">
+      <div class="flow-result-title">水質分析・確認状況</div>
+      <div id="result-water-analysis"></div>
+    </section>
+    <section class="data-table-section">
+      <div class="flow-result-title">機器仕様・見積依頼用一覧</div>
+      <div id="result-quote-equipment"></div>
+    </section>
+
     <!-- 使用薬剤・添加量 -->
     <div class="chemical-section" id="result-chemical-section" style="display:none;">
       <div class="flow-result-title">使用薬剤・添加量</div>
@@ -2083,6 +2150,7 @@ const data = WizardCore.createInitialData();
 
 let currentStep = 1;
 let _restoring = false; // 復元中はsaveToLocalStorageをスキップ
+let salesSignature = '';
 
 // ===== LocalStorage Auto-Save =====
 const LEGACY_LS_KEY = 'ww-draft';
@@ -2170,8 +2238,9 @@ function saveToLocalStorage() {
     activeDraftId ||= newDraftId();
     const savedAt = Date.now();
     const normalized = WizardCore.normalizeData(data);
+    const existing = getDrafts().find(draft => draft.id === activeDraftId);
     const drafts = getDrafts().filter(draft => draft.id !== activeDraftId);
-    drafts.push({ id: activeDraftId, version: 2, data: normalized, step: currentStep, savedAt });
+    drafts.push({ ...existing, id: activeDraftId, version: 3, data: normalized, step: currentStep, savedAt });
     saveDrafts(drafts);
     flashSaveIndicator();
   } catch(e) {
@@ -2218,9 +2287,14 @@ function resumeDraft() {
   const payload = getDrafts().find(draft => draft.id === selectedDraftId);
   if (!payload) return;
   _restoring = true;
+  // Keep an untouched snapshot of pre-reorganization data with this draft.
+  if (payload.data.hearing_version !== '3' && !payload.legacySnapshot) {
+    payload.legacySnapshot = { data: payload.data, step: payload.step, savedAt: payload.savedAt };
+    try { saveDrafts(getDrafts().map(draft => draft.id === payload.id ? payload : draft)); } catch (e) {}
+  }
   Object.assign(data, WizardCore.normalizeData(payload.data));
   activeDraftId = payload.id;
-  _restoreUI(payload.step || 1);
+  _restoreUI(payload.data.hearing_version === '3' ? Math.min(5, Math.max(1, Number(payload.step) || 1)) : 1);
   _restoring = false;
   document.getElementById('draft-banner').style.display = 'none';
   saveToLocalStorage(); // 復元後に一度保存して最終保存時刻を更新
@@ -2238,7 +2312,7 @@ function discardDraft() {
 
 function startNewDraft(skipConfirm = false) {
   const hasInput = Object.entries(data).some(([key, value]) => {
-    if (['pump_count', 'sensor_count'].includes(key)) return false;
+    if (['pump_count', 'sensor_count', 'hearing_version'].includes(key)) return false;
     return Array.isArray(value) ? value.length > 0 : typeof value === 'object' ? Object.keys(value || {}).length > 0 : String(value || '').trim() !== '';
   });
   if (!skipConfirm && hasInput && !window.confirm('現在の案件は下書きとして保存されます。新しい案件を開始しますか？')) return;
@@ -2298,7 +2372,7 @@ function _restoreUI(targetStep) {
   });
 
   // ── チェックボックス（onclick属性から値を照合） ──
-  ['metals','hazardous','other_contam','chemicals','level_sensors','carry_in','access',
+  ['metals','hazardous','other_contam','water_components','chemicals','level_sensors','carry_in','access',
    'option_tanks','option_ph_tanks','option_turbidity_tanks'
   ].forEach(key => {
     const vals = data[key];
@@ -2361,7 +2435,7 @@ function _restoreUI(targetStep) {
     const empty = document.createElement('tr');
     empty.id = 'extra-pump-empty';
     empty.style.color = 'var(--text3)'; empty.style.fontSize = '12px';
-    empty.innerHTML = '<td colspan="5" style="padding:12px 4px;text-align:center;">「＋機器を追加」から入力してください</td>';
+    empty.innerHTML = '<td colspan="3" style="padding:12px 4px;text-align:center;">「＋機器を追加」から入力してください</td>';
     document.getElementById('extra-pump-rows').appendChild(empty);
   }
 
@@ -2373,6 +2447,7 @@ function _restoreUI(targetStep) {
   updateSummary();
 
   // ── ステップを復元 ──
+  renderSalesFields(true);
   if (targetStep > 1) {
     document.querySelectorAll('.step-panel').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.step-nav-item').forEach(el => {
@@ -2405,6 +2480,112 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return escapeHtml(value);
+}
+
+function salesField(group, key, field, label, value, options) {
+  const handler = escapeAttr(`setSalesValue(${JSON.stringify(group)},${JSON.stringify(key)},${JSON.stringify(field)},this.value)`);
+  const attr = `aria-label="${escapeAttr(key + ' ' + label)}"`;
+  let control;
+  if (Array.isArray(options)) {
+    const choices = ['', ...options];
+    if (value && !choices.includes(value)) choices.push(value);
+    control = `<select ${attr} onchange="${handler}">${choices.map(choice => `<option value="${escapeAttr(choice)}" ${choice === (value || '') ? 'selected' : ''}>${escapeHtml(choice || '未確認')}</option>`).join('')}</select>`;
+  } else if (field === 'note') {
+    control = `<textarea ${attr} rows="2" oninput="${handler}">${escapeHtml(value)}</textarea>`;
+  } else {
+    const type = options || 'text';
+    control = `<input ${attr} type="${type}" ${type === 'number' ? 'min="0" step="any"' : ''} value="${escapeAttr(value)}" oninput="${handler}">`;
+  }
+  return `<label ${field === 'note' ? 'class="wide"' : ''}>${label}${control}</label>`;
+}
+
+function setSalesValue(group, key, field, value) {
+  if (['__proto__', 'constructor', 'prototype'].includes(key)) return;
+  const bucket = group === 'water' ? data.water_analysis : data.equipment_specs;
+  bucket[key] ||= {};
+  bucket[key][field] = value;
+  if (group === 'equipment' && field === 'amp' && key.startsWith('extra:')) {
+    const item = data.extra_pumps.find(pump => pump && `extra:${pump.id}` === key);
+    if (item) item.amp = value;
+  }
+  if (group === 'equipment' && key === 'dehydrator') {
+    if (field === 'maker') data.dehydrator_maker = value;
+    if (field === 'model') data.dehydrator_model = value;
+  }
+  saveToLocalStorage();
+}
+
+function addWaterComponent() {
+  const input = document.getElementById('custom-water-name');
+  const name = input.value.trim();
+  if (!name || ['__proto__', 'constructor', 'prototype', 'なし', 'なし/不明'].includes(name)) return;
+  if (!WizardCore.getWaterAnalysisNames(data).includes(name)) data.water_components.push(name);
+  input.value = '';
+  updateSummary();
+}
+
+function removeWaterComponent(name) {
+  data.water_components = data.water_components.filter(item => item !== name);
+  updateSummary();
+}
+
+function renderSalesFields(force = false) {
+  const equipment = WizardCore.getQuoteEquipment(data);
+  const names = WizardCore.getWaterAnalysisNames(data);
+  const signature = JSON.stringify([names, equipment.map(({spec, ...item}) => item), data.legacy_notes]);
+  if (!force && signature === salesSignature) return;
+  salesSignature = signature;
+  document.getElementById('legacy-notes-section').hidden = !data.legacy_notes;
+  document.getElementById('legacy-notes').textContent = data.legacy_notes;
+  const standard = ['全リン', 'リン酸態リン', '全窒素', 'アンモニア性窒素', '界面活性剤', '溶剤', '塩類'];
+  document.getElementById('custom-water-components').innerHTML = data.water_components.filter(name => !standard.includes(name)).map(name =>
+    `<div class="inline-add"><span>${escapeHtml(name)}</span><button type="button" class="btn btn-secondary" aria-label="${escapeAttr(name + 'を解除')}" onclick="${escapeAttr(`removeWaterComponent(${JSON.stringify(name)})`)}">解除</button></div>`).join('');
+  document.getElementById('water-analysis-fields').innerHTML = names.map(name => {
+    const a = data.water_analysis[name] || {};
+    return `<details class="sales-detail"><summary>${escapeHtml(name)}</summary><div class="sales-fields">
+      ${salesField('water', name, 'status', '確認状況', a.status, ['含有確認', '不検出', '未分析／不明'])}
+      ${salesField('water', name, 'value', '分析値', a.value, 'number')}
+      ${salesField('water', name, 'unit', '単位', a.unit, ['mg/L', 'mg-P/L', 'mg-N/L', 'µg/L', '%', 'mS/cm'])}
+      ${salesField('water', name, 'date', '分析日', a.date, 'date')}
+      ${salesField('water', name, 'source', '分析資料名', a.source)}
+      ${salesField('water', name, 'note', '分析の備考', a.note)}
+    </div></details>`;
+  }).join('');
+  document.getElementById('quote-equipment-fields').innerHTML = equipment.map(item => {
+    const s = item.spec;
+    return `<details class="sales-detail" data-quote-key="${escapeAttr(item.key)}"><summary>${escapeHtml(item.tag + ' / ' + item.name)}<span>${escapeHtml(item.tank || '設置場所未確認')} / ${escapeHtml(item.count || '台数未確認')}${item.count ? '台' : ''}</span></summary>
+      <div class="sales-fields">
+        ${salesField('equipment', item.key, 'maker', 'メーカー', s.maker)}
+        ${salesField('equipment', item.key, 'model', '型番', s.model)}
+        ${salesField('equipment', item.key, 'output_kw', '定格出力（kW／台）', s.output_kw, 'number')}
+        ${salesField('equipment', item.key, 'amp', '定格電流（A／台）', s.amp, 'number')}
+        ${salesField('equipment', item.key, 'voltage', '電圧（V）', s.voltage, 'number')}
+        ${salesField('equipment', item.key, 'phase', '相数', s.phase, ['三相', '単相', '対象外（直流など）'])}
+        ${salesField('equipment', item.key, 'frequency', '周波数', s.frequency, ['50Hz', '60Hz', '50・60Hz共用'])}
+        ${item.legacyPower ? `<p class="wide">旧入力の容量：${escapeHtml(item.legacyPower)} kW（定格出力との対応は未確認）</p>` : ''}
+        ${s.power !== '' ? `<p class="wide">旧入力の消費電力：${escapeHtml(s.power)} ${escapeHtml(s.power_unit || 'kW')}／台</p>` : ''}
+        ${salesField('equipment', item.key, 'note', '機器の備考', s.note)}
+      </div></details>`;
+  }).join('');
+}
+
+function buildSalesTables() {
+  const table = (headers, rows) => `<table class="quote-table"><thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(value => `<td>${escapeHtml(value)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const water = WizardCore.getWaterAnalysisNames(data).flatMap(name => {
+    const a = data.water_analysis[name] || {};
+    if (!Object.values(a).some(Boolean) && ['SS', '油分', 'BOD', 'COD'].includes(name)) return [];
+    return [[name, a.status || '未確認', a.value !== undefined && a.value !== '' ? `${a.value} ${a.unit || '単位未確認'}` : '未確認',
+      [a.date, a.source, a.note].filter(Boolean).join('\n') || '未確認']];
+  });
+  document.getElementById('result-water-analysis').innerHTML = water.length ? table(['水質項目', '確認状況', '分析値', '分析日・資料・備考'], water) : '<p>分析情報未入力</p>';
+  const equipment = WizardCore.getQuoteEquipment(data).map(item => {
+    const s = item.spec;
+    return [item.tag + '\n' + item.name + '\n' + (item.tank || '設置場所未確認') + '\n' + (item.count ? item.count + '台' : '台数未確認'),
+      'メーカー：' + (s.maker || '未確認') + '\n型番：' + (s.model || '未確認'),
+      '定格出力：' + (s.output_kw !== '' ? s.output_kw + ' kW／台' : '未確認') + '\n定格電流：' + (s.amp !== '' ? s.amp + ' A／台' : '未確認') + '\n電圧：' + (s.voltage !== '' ? s.voltage + ' V' : '未確認') + '\n相数：' + (s.phase || '未確認') + '\n周波数：' + (s.frequency || '未確認'),
+      [s.note, item.legacyPower ? `旧容量：${item.legacyPower} kW（定格出力との対応未確認）` : '', s.power !== '' ? `旧消費電力：${s.power} ${s.power_unit || 'kW'}／台` : ''].filter(Boolean).join('\n') || ''];
+  });
+  document.getElementById('result-quote-equipment').innerHTML = table(['機器・設置場所・台数', 'メーカー・型番', '電気定格（1台あたり）', '備考'], equipment);
 }
 
 function selectRadio(key, value, el) {
@@ -2540,12 +2721,14 @@ function setArrow(id, show) {
 function updateSummary() {
   updateFlowPreview();
   renderBatchCapacity();
+  renderSalesFields();
   const rows = [
     ['業種', data.industry ? getIndustryLabel(data.industry) : ''],
     ['排水量', data.daily_volume ? data.daily_volume + ' m³/日' : ''],
     ['バッチ回数', data.batch_count],
     ['pH範囲', (data.ph_min || data.ph_max) ? (data.ph_min||'?') + '〜' + (data.ph_max||'?') : ''],
-    ['重金属', (data.metals||[]).join(', ')],
+    ['金属・無機成分', (data.metals||[]).join(', ')],
+    ['栄養塩類・その他', (data.water_components||[]).join(', ')],
     ['特定有害物質', (data.hazardous||[]).join(', ')],
     ['放流先', data.discharge_dest],
   ].filter(r => r[1]);
@@ -2607,6 +2790,7 @@ function buildBatchCapacityHTML(d) {
 
 function renderBatchCapacity() {
   document.getElementById('capacity-preview').innerHTML = buildBatchCapacityHTML(data);
+  document.getElementById('capacity-daily-volume').textContent = data.daily_volume ? `${data.daily_volume} m³/日` : '未入力';
 }
 
 function getIndustryLabel(v) {
@@ -2664,8 +2848,6 @@ function appendPumpRow(idx, pump) {
       ${equipmentSelect(idx, 'tank', WizardCore.EQUIPMENT_TANKS, pump.tank, '設置槽')}
     </td>
     <td style="padding:4px;"><input type="number" aria-label="追加機器${idx + 1} 台数" min="0" step="1" placeholder="1" style="width:52px;text-align:center;" oninput="updateExtraPump(${idx},'count',this.value)" value="${escapeAttr(pump.count)}"></td>
-    <td style="padding:4px;"><input type="number" aria-label="追加機器${idx + 1} 容量(kW)" min="0" step="0.1" placeholder="0.1" style="width:72px;text-align:center;" oninput="updateExtraPump(${idx},'lph',this.value)" value="${escapeAttr(pump.lph)}"></td>
-    <td style="padding:4px;"><input type="number" aria-label="追加機器${idx + 1} 定格電流(A)" min="0" step="0.1" placeholder="—" style="width:72px;text-align:center;" oninput="updateExtraPump(${idx},'amp',this.value)" value="${escapeAttr(pump.amp)}"></td>
     <td style="padding:4px;text-align:center;"><button type="button" aria-label="追加機器${idx + 1}を削除" onclick="removePumpRow(${idx})" style="background:none;border:none;color:var(--warn);cursor:pointer;font-size:16px;">✕</button></td>`;
   document.getElementById('extra-pump-rows').appendChild(tr);
 }
@@ -2675,10 +2857,10 @@ function addPumpRow() {
   if (empty) empty.remove();
   const idx = pumpRowCount++;
   if (!data.extra_pumps) data.extra_pumps = [];
-  const pump = { name: '', kind: 'ポンプ', tank: '', count: '1', lph: '', amp: '' };
+  const pump = { id: newDraftId(), name: '', kind: 'ポンプ', tank: '', count: '1', lph: '', amp: '' };
   data.extra_pumps[idx] = pump;
   appendPumpRow(idx, pump);
-  saveToLocalStorage();
+  updateSummary();
 }
 function removePumpRow(idx) {
   const tr = document.getElementById('pump-row-' + idx);
@@ -2689,7 +2871,7 @@ function removePumpRow(idx) {
     empty.id = 'extra-pump-empty';
     empty.style.color = 'var(--text3)';
     empty.style.fontSize = '12px';
-    empty.innerHTML = '<td colspan="5" style="padding:12px 4px; text-align:center;">「＋機器を追加」から入力してください</td>';
+    empty.innerHTML = '<td colspan="3" style="padding:12px 4px; text-align:center;">「＋機器を追加」から入力してください</td>';
     document.getElementById('extra-pump-rows').appendChild(empty);
   }
   updateSummary();
@@ -2906,7 +3088,7 @@ function generateResult() {
   const hasChromium6 = hazardous.includes('六価クロム(Cr6+)');
   const hasFluorine = hazardous.includes('フッ素(F)');
   const metals = data.metals || [];
-  const hasMetal = metals.length > 0 && !metals.every(m => m === 'なし');
+  const hasMetal = metals.some(m => ['クロム(Cr)', 'ニッケル(Ni)', '銅(Cu)', '亜鉛(Zn)', '鉛(Pb)', 'ヒ素(As)'].includes(m));
 
   // ---- ヘッダー情報 ----
   document.getElementById('result-customer-name').textContent = data.customer_name || '（顧客名未入力）';
@@ -2951,7 +3133,8 @@ function generateResult() {
     ['pH範囲', (data.ph_min || data.ph_max) ? (data.ph_min||'?') + ' 〜 ' + (data.ph_max||'?') : ''],
     ['原水水温', data.raw_water_temp ? data.raw_water_temp + ' ℃' : ''],
     ['汚泥量', data.sludge_amount !== '' ? data.sludge_amount + ' kg' : ''],
-    ['重金属', (data.metals||[]).join('、')],
+    ['金属・無機成分', (data.metals||[]).join('、')],
+    ['栄養塩類・その他', (data.water_components||[]).join('、')],
     ['特定有害物質', (data.hazardous||[]).join('、')],
     ['その他汚染物質', (data.other_contam||[]).join('、')],
     ['放流先', data.discharge_dest],
@@ -2975,15 +3158,24 @@ function generateResult() {
     ['横引き距離（荷下ろし〜設置）', data.pipe_distance ? data.pipe_distance + ' m' : ''],
     ['段差', data.pipe_step],
     ['スロープ', data.slope_status],
-    ['STEP1メモ', data.step_notes1],
-    ['STEP2メモ', data.step_notes2],
-    ['STEP3メモ', data.step_notes3],
-    ['STEP4メモ', data.step_notes4],
-    ['備考', data.notes],
+    ['基本情報の備考', data.step_notes1],
+    ['水質の備考', data.step_notes2],
+    ['装置構成の備考', data.step_notes3],
+    ['機器仕様の備考', data.step_notes4],
+    ['現場条件の備考', data.notes],
+    ['旧下書きの備考', data.legacy_notes],
   ].filter(r => r[1]);
 
   const tbody = document.querySelector('#result-data-table tbody');
-  tbody.innerHTML = rows.map(r => `<tr><td>${escapeHtml(r[0])}</td><td>${escapeHtml(r[1])}</td></tr>`).join('');
+  const sections = [
+    ['基本情報', ['顧客名', '導入区分', '納品場所', '希望納期', '担当者', '業種・業態', '基本情報の備考', '旧下書きの備考']],
+    ['排水・水質情報', ['排水の種類・内容', '1日の排水量', '稼働日数', 'pH範囲', '原水水温', '汚泥量', '金属・無機成分', '栄養塩類・その他', '特定有害物質', 'その他汚染物質', '放流先', '排水基準の把握', '水質の備考']],
+    ['装置構成・運転条件', ['装置容量', 'ろ過分岐数', '粉体供給機', '使用薬品', '薬注ポンプ台数', 'オプション（槽）', '脱水機', 'バッチ回数', '装置構成の備考']],
+    ['機器仕様', ['pH計 設置槽', '濁度計 設置槽', ...rows.filter(r => r[0].startsWith('追加機器')).map(r => r[0]), 'レベルセンサー', '機器仕様の備考']],
+    ['既存設備・現場条件', ['原水槽', '電源容量', '電源コード長さ', '一次側電源の接続形状', '設置スペース', '設置環境', '搬入機材', '搬入路条件', '横引き距離（荷下ろし〜設置）', '段差', 'スロープ', '現場条件の備考']]
+  ];
+  tbody.innerHTML = sections.map(([title, labels]) => `<tr class="data-section"><th colspan="2">${title}</th></tr>` + labels.flatMap(label => rows.filter(r => r[0] === label)).map(r => `<tr><td>${escapeHtml(r[0])}</td><td class="legacy-note">${escapeHtml(r[1])}</td></tr>`).join('')).join('');
+  buildSalesTables();
 
   // ---- 薬剤テーブル ----
   const chemSection = document.getElementById('result-chemical-section');
@@ -3071,7 +3263,7 @@ function resetFormUI() {
 
   document.getElementById('extra-pump-rows').innerHTML =
     '<tr id="extra-pump-empty" style="color:var(--text3); font-size:12px;">' +
-    '<td colspan="5" style="padding:12px 4px; text-align:center;">「＋機器を追加」から入力してください</td></tr>';
+    '<td colspan="3" style="padding:12px 4px; text-align:center;">「＋機器を追加」から入力してください</td></tr>';
   pumpRowCount = 0;
 
   document.getElementById('chem_other_wrap').style.display = 'none';
@@ -3098,6 +3290,7 @@ function resetFormUI() {
 
   updateFlowPreview();
   updateSummary();
+  renderSalesFields(true);
 }
 
 // ESCキーでモーダルを閉じる
@@ -3108,6 +3301,7 @@ document.addEventListener('keydown', e => {
 // Init
 updateFlowPreview();
 renderBatchCapacity();
+renderSalesFields(true);
 loadFromLocalStorage();
 </script>
 </body>

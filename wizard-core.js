@@ -3,10 +3,11 @@
 
   const ARRAY_FIELDS = [
     'chemicals', 'metals', 'hazardous', 'other_contam', 'option_tanks',
-    'option_ph_tanks', 'option_turbidity_tanks', 'level_sensors', 'carry_in', 'access'
+    'option_ph_tanks', 'option_turbidity_tanks', 'level_sensors', 'carry_in', 'access', 'water_components'
   ];
 
   const DEFAULT_DATA = {
+    hearing_version: '3', legacy_notes: '', water_components: [], water_analysis: {}, equipment_specs: {},
     customer_name: '', desired_delivery: '', staff_name: '',
     install_type: '', delivery_pref: '', delivery_city: '',
     industry: '', wastewater_type: '', daily_volume: '', working_days: '', batch_count: '',
@@ -74,11 +75,26 @@
     // Keep deleted row placeholders while the wizard is open. The DOM uses the
     // original row index for subsequent edits, so compacting this array corrupts data.
     normalized.extra_pumps = Array.isArray(source.extra_pumps)
-      ? source.extra_pumps.map((pump) => pump && typeof pump === 'object' ? {
-        ...pump, kind: asString(pump.kind), tank: asString(pump.tank)
+      ? source.extra_pumps.map((pump, index) => pump && typeof pump === 'object' ? {
+        ...pump, id: asString(pump.id) || `legacy-extra-${index}`, kind: asString(pump.kind), tank: asString(pump.tank)
       } : null)
       : [];
     normalized.chem_details = source.chem_details && typeof source.chem_details === 'object' ? source.chem_details : {};
+    for (const field of ['water_analysis', 'equipment_specs']) {
+      const fields = field === 'water_analysis' ? ['status', 'value', 'unit', 'date', 'source', 'note'] : ['maker', 'model', 'output_kw', 'amp', 'voltage', 'phase', 'frequency', 'power', 'power_unit', 'note'];
+      normalized[field] = Object.fromEntries(Object.entries(source[field] || {}).filter(([key, value]) =>
+        !['__proto__', 'constructor', 'prototype'].includes(key) && value && typeof value === 'object'
+      ).map(([key, value]) => [key, Object.fromEntries(fields.filter(name => Object.hasOwn(value, name)).map(name => [name, asString(value[name])]))]));
+    }
+    // Old notes span several new pages. Archive verbatim instead of guessing their subject.
+    if (source.hearing_version !== '3') {
+      const titles = ['基本情報', '水質情報', '装置オプション', '既存設備'];
+      const oldNotes = titles.flatMap((title, index) => source[`step_notes${index + 1}`]
+        ? [`旧STEP${index + 1}（${title}）\n${source[`step_notes${index + 1}`]}`] : []);
+      normalized.legacy_notes = [normalized.legacy_notes, ...oldNotes].filter(Boolean).join('\n\n');
+      titles.forEach((_, index) => { normalized[`step_notes${index + 1}`] = ''; });
+      normalized.hearing_version = '3';
+    }
 
     // Older drafts stored the ambiguous choice as "なし".
     normalized.hazardous = normalized.hazardous.map((value) => value === 'なし' ? 'なし/不明' : value);
@@ -92,6 +108,52 @@
       if (typeof DEFAULT_DATA[key] === 'string') normalized[key] = asString(normalized[key]);
     });
     return normalized;
+  }
+
+  function getWaterAnalysisNames(data) {
+    return [...new Set(['SS', '油分', 'BOD', 'COD', ...asArray(data.metals), ...asArray(data.hazardous),
+      ...asArray(data.water_components)].filter(name => !['なし', 'なし/不明'].includes(name)))];
+  }
+
+  // Keys identify physical roles, never their current position in a drawing or list.
+  function getQuoteEquipment(data) {
+    const rows = [];
+    const add = (key, tag, name, tank, count = '1', legacy = {}) => rows.push({
+      key, tag, name, tank, count, legacyPower: asString(legacy.lph),
+      spec: { maker: '', model: '', output_kw: '', amp: asString(legacy.amp), voltage: '', phase: '', power: '', power_unit: 'kW', frequency: '', note: '',
+        ...(data.equipment_specs?.[key] || {}) }
+    });
+    const config = getProcessConfig(data);
+    add('transfer:raw', 'TP-01', '原水移送ポンプ', '原水槽');
+    add('mixer:reactor', 'MX-01', '本体攪拌機', '凝集沈殿槽');
+    if (config.hasRelay) add('transfer:relay', 'TP-02', '中継移送ポンプ', '中継槽');
+    const chemicals = [...asArray(data.chemicals).filter(name => !(data.powder_feeder === '使用する' && name === '液体凝集剤')), ...getOtherChemicalKeys(data)];
+    chemicals.forEach((name, i) => add(`chemical:${name}`, `DP-${String(i + 1).padStart(2, '0')}`, `薬注ポンプ / ${name}`, '凝集沈殿槽'));
+    if (data.powder_feeder === '使用する') add('powder', 'PF-01', '粉体供給機', '凝集沈殿槽');
+    for (const [field, type, prefix] of [['option_ph_tanks', 'pH計', 'PH'], ['option_turbidity_tanks', '濁度計', 'TU'], ['level_sensors', 'レベルセンサー', 'LS']]) {
+      const order = ['凝集沈殿槽', '原水槽', '中継槽', '監視槽', '汚泥貯槽', 'ろ過受け槽'];
+      const tanks = order.filter(tank => getEquipmentTanks(data).includes(tank) &&
+        ((tank === '凝集沈殿槽' && prefix !== 'TU') || asArray(data[field]).includes(tank)));
+      tanks.forEach((tank, i) => add(`${prefix}:${tank}`, `${prefix}-${i + 1}`, type, tank));
+    }
+    if (data.sensor_other_selected) add('sensor:other', 'LS-OTHER', 'レベルセンサー（その他）', data.sensor_other_note, data.sensor_other_count);
+    add('valve:supernatant', 'MV-1', '上澄液出口電磁弁', '凝集沈殿槽');
+    add('valve:sludge', 'MV-2', '汚泥出口電磁弁', '凝集沈殿槽');
+    if (config.basketCount > 1) for (let i = 0; i < config.basketCount; i++) add(`valve:filter:${i}`, `MV-${i + 3}`, `ろ過分岐${i + 1}電磁弁`, 'ろ過受け槽');
+    if (data.option_dehydrator === '必要') {
+      add('dehydrator', 'DH-01', '脱水機', '');
+      rows.at(-1).spec.maker ||= data.dehydrator_maker || '';
+      rows.at(-1).spec.model ||= data.dehydrator_model || '';
+    }
+    let number = 0;
+    (data.extra_pumps || []).forEach((item, index) => {
+      if (!item) return;
+      number++;
+      if (isPresent(item.count) && Number(item.count) === 0) return;
+      const prefix = item.kind === '攪拌機' ? 'AM' : item.kind === 'その他' ? 'AE' : 'AP';
+      add(`extra:${item.id || `legacy-extra-${index}`}`, `${prefix}-${String(number).padStart(2, '0')}`, item.name || item.kind || '追加機器', item.tank, item.count, item);
+    });
+    return rows;
   }
 
   function getOtherChemicalKeys(data) {
@@ -198,6 +260,15 @@
     const errors = [];
     const warnings = [];
     const addWarning = (condition, message) => { if (condition) warnings.push(message); };
+    getQuoteEquipment(data).forEach(item => {
+      for (const [key, label] of [['output_kw', '定格出力'], ['amp', '定格電流'], ['voltage', '電圧'], ['power', '旧消費電力']]) {
+        if (!isNumberInRange(item.spec[key], 0, Infinity)) errors.push(`${item.name}の${label}は0以上の数値で入力してください。`);
+      }
+    });
+    getWaterAnalysisNames(data).forEach(name => {
+      const analysis = data.water_analysis?.[name];
+      if (analysis && !isNumberInRange(analysis.value, 0, Infinity)) errors.push(`${name}の分析値は0以上の数値で入力してください。`);
+    });
     const capacity = calculateBatchCapacity(data);
     errors.push(...capacity.errors);
     addWarning(capacity.status === 'insufficient', 'バッチ処理能力が不足しています。装置容量・運転時間・処理条件を見直してください。');
@@ -272,6 +343,8 @@
     EQUIPMENT_TANKS,
     getEquipmentTanks,
     getProcessConfig,
+    getWaterAnalysisNames,
+    getQuoteEquipment,
     createInitialData,
     normalizeData,
     getOtherChemicalKeys,
