@@ -165,11 +165,11 @@ test('selected relay, monitor and sludge tanks have distinct symbols and connect
   }
 });
 
-test('instrument stems are solid while chemical dosing lines retain their own line type', () => {
+test('instrument stems are solid without arrows while chemical dosing lines retain their own line type', () => {
   const svg = build({ option_tanks: ['監視槽'], option_ph_tanks: ['監視槽'], option_turbidity_tanks: ['監視槽'], level_sensors: ['ろ過受け槽'], filter_branches: '2分岐', chemicals: ['酸'] });
   const instruments = [...svg.matchAll(/<g data-instrument="[^"]+"[^>]*>([\s\S]*?)<\/g>/g)];
   assert.ok(instruments.length >= 5);
-  for (const [, body] of instruments) assert.doesNotMatch(body, /stroke-dasharray/);
+  for (const [, body] of instruments) assert.doesNotMatch(body, /stroke-dasharray|marker-(?:start|mid|end)/);
   assert.match(svg, /data-kind="chemical"[^>]*stroke-dasharray/);
 });
 
@@ -264,7 +264,8 @@ test('selected branch count feeds that many baskets inside a single common recei
       assert.equal([...svg.matchAll(/data-part="filter-receiver"/g)].length, 1);
       const baskets = [...svg.matchAll(/<g data-basket="([^"]+)" data-tank="FL-01">([\s\S]*?)<\/g>/g)];
       assert.equal(baskets.length, count);
-      const branches = edges(svg).filter(edge => edge.id.startsWith('filter-branch-'));
+      const directSingleBasket = count === 1 && option_tanks.length === 0;
+      const branches = edges(svg).filter(edge => directSingleBasket ? edge.id === 'sludge-filter' : edge.id.startsWith('filter-branch-'));
       assert.equal(branches.length, count);
       assert.equal(edges(svg).filter(edge => edge.id === 'filtrate-discharge').length, 1);
       let previousRight = left;
@@ -275,7 +276,7 @@ test('selected branch count feeds that many baskets inside a single common recei
         const basketBottom = Number(body.match(/ V([\d.]+)/)[1]);
         assert.ok(y - 8 > rim && basketBottom + 8 < bottom, 'whole basket sits inside receiver');
         const branch = branches.find(edge => edge.to === tag);
-        assert.equal(branch.from, 'FL-01');
+        assert.equal(branch.from, directSingleBasket ? 'TK-02' : 'FL-01');
         const route = svg.match(new RegExp(`data-pipe="${branch.id}"[^>]* d="M([\\d.]+),([\\d.]+) L([\\d.]+),([\\d.]+)"`)).slice(1).map(Number);
         assert.equal(route[0], x);
         assert.equal(route[2], x);
@@ -284,6 +285,38 @@ test('selected branch count feeds that many baskets inside a single common recei
       assert.match(svg, new RegExp(`カゴ${count}個`));
     }
   }
+});
+
+test('a single basket without sludge storage is directly below MV-2 with only one inlet arrow', () => {
+  for (const option_tanks of [[], ['監視槽'], ['中継槽', '監視槽']]) {
+    for (const expanded of [false, true]) {
+      const svg = build({ filter_branches: '分岐なし', option_tanks, powder_feeder: '使用する',
+        chemicals: expanded ? Array.from({length: 10}, (_, i) => `薬品${i}`) : [],
+        extra_pumps: expanded ? ['凝集沈殿槽', 'ろ過受け槽'].map(tank => ({kind: '攪拌機', tank, count: '1'})) : [],
+        level_sensors: ['ろ過受け槽'] });
+      const valve = svg.match(/<g data-equipment="MV-2"[^>]*><circle cx="([\d.]+)" cy="([\d.]+)"/);
+      const basket = svg.match(/data-basket="FL-01-B01"[\s\S]*?<ellipse cx="([\d.]+)" cy="([\d.]+)"/);
+      const inlet = svg.match(/<path data-pipe="sludge-filter"[^>]*\/>/)[0];
+      const points = [...inlet.matchAll(/[ML]([\d.]+),([\d.]+)/g)].map(m => m.slice(1).map(Number));
+      assert.equal(points.length, 2, 'one continuous path with no bends');
+      for (const [x] of points) assert.equal(x, Number(valve[1]));
+      assert.equal(Number(basket[1]), Number(valve[1]), 'basket is centered below MV-2');
+      assert.ok(points[0][1] < Number(valve[2]) && Number(valve[2]) < points[1][1]);
+      assert.equal(points[1][1], Number(basket[2]) - 12, 'arrow ends at the basket opening');
+      assert.match(inlet, /data-from="TK-02" data-to="FL-01-B01"/);
+      assert.match(inlet, /marker-end/);
+      assert.doesNotMatch(svg, /data-pipe="filter-branch-|data-part="filter-header"|r="3" fill="#20252b"/);
+    }
+  }
+});
+
+test('a single basket still receives sludge through storage when that tank is selected', () => {
+  const svg = build({ filter_branches: '分岐なし', option_tanks: ['汚泥貯槽'] });
+  const connections = edges(svg);
+  assert.ok(connections.some(edge => edge.id === 'sludge-storage' && edge.from === 'TK-02' && edge.to === 'TK-04'));
+  assert.ok(connections.some(edge => edge.id === 'sludge-filter' && edge.from === 'TK-04' && edge.to === 'FL-01'));
+  assert.ok(!connections.some(edge => edge.from === 'TK-02' && edge.to === 'FL-01'));
+  assert.match(svg, /data-pipe="sludge-filter"[^>]*marker-end/);
 });
 
 test('five baskets leave separate space for receiver mixers, pumps and level sensor', () => {
@@ -319,7 +352,7 @@ test('powder hopper sits directly above a straight downward feed and stays separ
   }
 });
 
-test('reactor instruments point vertically into the vessel in lanes clear of mixers and feed ports', () => {
+test('reactor instruments extend vertically without arrows in lanes clear of mixers and feed ports', () => {
   for (const extraCount of [0, 2]) for (const powder_feeder of ['使用する', '使用しない']) {
     const svg = build({ powder_feeder, chemicals: ['酸', 'アルカリ'], option_turbidity_tanks: ['凝集沈殿槽'],
       extra_pumps: Array.from({length: extraCount}, () => ({kind: '攪拌機', tank: '凝集沈殿槽', count: '1'})) });
@@ -328,8 +361,9 @@ test('reactor instruments point vertically into the vessel in lanes clear of mix
     const xs = [];
     for (const [, body] of probes) {
       const circle = body.match(/<circle cx="([\d.]+)" cy="([\d.]+)"/);
-      const stem = body.match(/<path d="M([\d.]+),([\d.]+) V([\d.]+)"[^>]*marker-end=/);
-      assert.ok(stem, 'straight vertical arrow with no horizontal bends');
+      const stem = body.match(/<path d="M([\d.]+),([\d.]+) V([\d.]+)"[^>]*\/>/);
+      assert.ok(stem, 'straight vertical stem with no horizontal bends');
+      assert.doesNotMatch(stem[0], /marker-(?:start|mid|end)/);
       assert.equal(stem[1], circle[1]);
       assert.ok(Number(stem[2]) < 490 && Number(stem[3]) > 490);
       xs.push(Number(circle[1]));
