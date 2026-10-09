@@ -85,6 +85,21 @@ function loadWizard(storage = new Map(), options = {}) {
     run(`(function () { ${handler} }).call(document.getElementById(${JSON.stringify(id)}))`);
   };
   const selectCapacity = value => run(`selectRadio('tank_capacity', ${JSON.stringify(value)}, document.getElementById('tank_capacity'))`);
+  const radio = key => {
+    const group = elements.get(key);
+    const markup = html.match(new RegExp(`<div class="radio-grid" id="${key}"[^>]*>([\\s\\S]*?)\\n        </div>`))[1];
+    const choices = [...markup.matchAll(/<div class="radio-item" onclick="([^"]+)">/g)].map(([, handler], index) => {
+      const element = makeElement();
+      const id = `${key}-choice-${index}`;
+      element.setAttribute('onclick', handler);
+      element.closest = () => group;
+      elements.set(id, element);
+      const value = handler.match(/selectRadio\([^,]+,\s*'([^']+)'/)[1];
+      return { element, value, click: () => run(`(function () { ${handler} }).call(document.getElementById(${JSON.stringify(id)}))`) };
+    });
+    group.querySelectorAll = () => choices.map(choice => choice.element);
+    return choices;
+  };
   const fillCapacity = () => {
     input('daily_volume', '5');
     input('operating_hours', '8');
@@ -92,8 +107,117 @@ function loadWizard(storage = new Map(), options = {}) {
     input('working_volume_percent', '80');
     selectCapacity('500L');
   };
-  return { elements, run, input, selectCapacity, fillCapacity, storage, alerts, confirmations, table, flowSVG, created, downloads, timers, revoked };
+  return { elements, run, input, radio, selectCapacity, fillCapacity, storage, alerts, confirmations, table, flowSVG, created, downloads, timers, revoked };
 }
+
+for (const [key, initial, replacement, resultLabel] of [
+  ['discharge_dest', '公共下水道', '河川・湖沼', '放流先'],
+  ['regulation_status', '把握済み', '概ね把握', '排水基準の把握']
+]) {
+  test(`${key} toggles off, switches choices and persists cleared state through draft restoration`, () => {
+    const app = loadWizard();
+    const choices = app.radio(key);
+    choices[0].click();
+    assert.equal(app.run(`data.${key}`), initial);
+    assert.ok(choices[0].element.classList.contains('selected'));
+    choices[0].click();
+    assert.equal(app.run(`data.${key}`), '');
+    assert.ok(choices.every(c => !c.element.classList.contains('selected')));
+    choices[0].click();
+    choices[1].click();
+    assert.equal(app.run(`data.${key}`), replacement);
+    assert.ok(!choices[0].element.classList.contains('selected'));
+    assert.ok(choices[1].element.classList.contains('selected'));
+
+    const restored = loadWizard(app.storage);
+    const restoredChoices = restored.radio(key);
+    restored.run('resumeDraft()');
+    assert.ok(restoredChoices[1].element.classList.contains('selected'));
+    restoredChoices[1].click();
+    assert.ok(restoredChoices.every(c => !c.element.classList.contains('selected')));
+    const cleared = loadWizard(app.storage);
+    const clearedChoices = cleared.radio(key);
+    cleared.run('resumeDraft(); generateResult()');
+    assert.equal(cleared.run(`data.${key}`), '');
+    assert.ok(clearedChoices.every(c => !c.element.classList.contains('selected')));
+    assert.doesNotMatch(cleared.table.innerHTML, new RegExp(`<td>${resultLabel}</td>`));
+  });
+}
+
+for (const [, key] of html.matchAll(/<div class="radio-grid" id="([^"]+)"/g)) {
+  test(`${key}: every choice can be cleared, including after draft restoration`, () => {
+    const app = loadWizard();
+    const choices = app.radio(key);
+    assert.ok(choices.length > 0);
+    for (const [index, choice] of choices.entries()) {
+      choice.click();
+      assert.equal(app.run(`data.${key}`), choice.value);
+      assert.ok(choice.element.classList.contains('selected'));
+      choice.click();
+      assert.equal(app.run(`data.${key}`), '');
+      assert.ok(choices.every(c => !c.element.classList.contains('selected')));
+      choice.click();
+      const restored = loadWizard(app.storage);
+      const restoredChoices = restored.radio(key);
+      restored.run('resumeDraft()');
+      assert.ok(restoredChoices[index].element.classList.contains('selected'));
+      restoredChoices[index].click();
+      const cleared = loadWizard(app.storage);
+      const clearedChoices = cleared.radio(key);
+      cleared.run('resumeDraft()');
+      assert.equal(cleared.run(`data.${key}`), '');
+      assert.ok(clearedChoices.every(c => !c.element.classList.contains('selected')));
+      choice.click();
+    }
+  });
+}
+
+test('clearing equipment selections updates dependent details, counts and previews', () => {
+  const app = loadWizard();
+  const dehydrator = app.radio('option_dehydrator')[0];
+  dehydrator.click();
+  assert.equal(app.elements.get('dehydrator-detail').style.display, 'block');
+  dehydrator.click();
+  assert.equal(app.elements.get('dehydrator-detail').style.display, 'none');
+  assert.doesNotMatch(app.elements.get('quote-equipment-fields').innerHTML, /data-quote-key="dehydrator"/);
+
+  const rawTank = app.radio('raw_tank')[0];
+  rawTank.click();
+  app.input('raw_tank_size', '3');
+  rawTank.click();
+  assert.equal(app.run('data.raw_tank_size'), '');
+  assert.equal(app.elements.get('raw_tank_size').value, '');
+
+  app.run(`updateData('chemicals', ['液体凝集剤'])`);
+  const powder = app.radio('powder_feeder')[0];
+  powder.click();
+  assert.equal(app.run('data.pump_count'), 0);
+  powder.click();
+  assert.equal(app.run('data.pump_count'), 1);
+  assert.doesNotMatch(app.elements.get('quote-equipment-fields').innerHTML, /data-quote-key="powder"/);
+
+  app.fillCapacity();
+  assert.match(app.elements.get('capacity-preview').innerHTML, /data-status="insufficient"/);
+  app.selectCapacity('500L');
+  assert.match(app.elements.get('capacity-preview').innerHTML, /data-status="incomplete"/);
+  const filter = app.radio('filter_branches')[1];
+  filter.click();
+  assert.equal(app.elements.get('fn-filter').style.display, '');
+  filter.click();
+  assert.equal(app.elements.get('fn-filter').style.display, 'none');
+});
+
+test('wastewater reuse is saved and included in the result and flow diagram', () => {
+  const app = loadWizard();
+  const reuse = app.radio('discharge_dest').find(choice => choice.value === '再利用');
+  assert.ok(reuse);
+  reuse.click();
+  const restored = loadWizard(app.storage);
+  restored.run('resumeDraft(); generateResult()');
+  assert.equal(restored.run('data.discharge_dest'), '再利用');
+  assert.match(restored.table.innerHTML, /再利用/);
+  assert.match(restored.elements.get('result-flow').innerHTML, /再利用/);
+});
 
 test('real input handlers recalculate and persist conditions; result/PDF uses identical calculations', () => {
   const app = loadWizard();

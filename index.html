@@ -1602,6 +1602,7 @@
           <div class="radio-item" onclick="selectRadio('discharge_dest', '公共下水道', this); updateFlowPreview()">公共下水道</div>
           <div class="radio-item" onclick="selectRadio('discharge_dest', '河川・湖沼', this); updateFlowPreview()">河川・湖沼</div>
           <div class="radio-item" onclick="selectRadio('discharge_dest', '海域', this); updateFlowPreview()">海域</div>
+          <div class="radio-item" onclick="selectRadio('discharge_dest', '再利用', this); updateFlowPreview()">再利用</div>
           <div class="radio-item" onclick="selectRadio('discharge_dest', '不明', this); updateFlowPreview()">不明</div>
         </div>
       </div>
@@ -1721,7 +1722,7 @@
       <div class="field-group">
         <div class="field-label">脱水機</div>
         <div class="radio-grid" id="option_dehydrator">
-          <div class="radio-item" onclick="selectRadio('option_dehydrator', '必要', this); toggleDehydratorDetail(true)">必要</div>
+          <div class="radio-item" onclick="selectRadio('option_dehydrator', '必要', this); toggleDehydratorDetail(data.option_dehydrator === '必要')">必要</div>
           <div class="radio-item" onclick="selectRadio('option_dehydrator', '不要', this); toggleDehydratorDetail(false)">不要</div>
           <div class="radio-item" onclick="selectRadio('option_dehydrator', '未定', this); toggleDehydratorDetail(false)">未定</div>
         </div>
@@ -2589,9 +2590,12 @@ function buildSalesTables() {
 }
 
 function selectRadio(key, value, el) {
+  if (data[key] === value) {
+    value = '';
+  }
   data[key] = value;
   el.closest('.radio-grid').querySelectorAll('.radio-item').forEach(e => e.classList.remove('selected'));
-  el.classList.add('selected');
+  if (value !== '') el.classList.add('selected');
   if (key === 'raw_tank' && value !== 'あり') {
     data.raw_tank_size = '';
     const sizeEl = document.getElementById('raw_tank_size');
