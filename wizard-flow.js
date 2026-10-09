@@ -55,7 +55,8 @@
     const lowerY = Math.max(Math.max(raw.y + raw.h, coag.y + coag.h, hasRelay ? relay.y + relay.h : 0, hasMonitor ? monitor.y + monitor.h : 0) + 115, coagCaptionY + (mixers('汚泥貯槽').length ? 125 : 95));
     const sludge = { id: 'TK-04', name: '汚泥貯槽', x: coag.x - 220, w: vesselWidth('汚泥貯槽'), y: lowerY, h: Math.max(120, 90 + located('汚泥貯槽').length * 60), extraY: 90 };
     const basketAreaWidth = 30 + basketCount * 90;
-    const filter = { id: 'FL-01', name: 'ろ過装置', x: Math.max(coag.x + 110, hasSludge ? sludge.x + sludge.w + 190 : 0), w: basketAreaWidth + mixers('ろ過受け槽').length * 60, y: lowerY, h: 250 + located('ろ過受け槽').length * 60, extraY: 250 };
+    const directSingleBasket = basketCount === 1 && !hasSludge;
+    const filter = { id: 'FL-01', name: 'ろ過装置', x: directSingleBasket ? coag.x + coag.w / 2 - 60 : Math.max(coag.x + 110, hasSludge ? sludge.x + sludge.w + 190 : 0), w: basketAreaWidth + mixers('ろ過受け槽').length * 60, y: lowerY, h: 250 + located('ろ過受け槽').length * 60, extraY: 250 };
     const tanks = [raw, coag, ...(hasRelay ? [relay] : []), ...(hasMonitor ? [monitor] : []), ...(hasSludge ? [sludge] : []), ...(filterConfigured ? [{...filter, name: 'ろ過受け槽'}] : [])];
     // One registry supplies both drawing tags and schedule rows. Standard probes keep number 1.
     const probeTypes = [
@@ -153,7 +154,7 @@
     };
     const instrument = (cx, cy, probe, targetY, targetX = cx, bendY = cy + 26) => {
       const stem = targetX === cx ? `M${cx},${cy + 18} V${targetY}` : `M${cx},${cy + 18} V${bendY} H${targetX} V${targetY}`;
-      pieces.push(`<g data-instrument="${probe.label}" data-equipment="${probe.tag}" data-tank="${probe.tank.id}"><circle cx="${cx}" cy="${cy}" r="18" fill="white"/><text x="${cx}" y="${cy + 5}" fill="#20252b" stroke="none" font-size="13" text-anchor="middle">${probe.label}</text><path d="${stem}" fill="none" ${probe.tank === coag ? `marker-end="url(#${prefix}-arrow)"` : ''}/>`);
+      pieces.push(`<g data-instrument="${probe.label}" data-equipment="${probe.tag}" data-tank="${probe.tank.id}"><circle cx="${cx}" cy="${cy}" r="18" fill="white"/><text x="${cx}" y="${cy + 5}" fill="#20252b" stroke="none" font-size="13" text-anchor="middle">${probe.label}</text><path d="${stem}" fill="none"/>`);
       text(cx, cy - 27, probe.tag, 12, 'middle');
       pieces.push('</g>');
     };
@@ -299,14 +300,15 @@
     if (filterConfigured) {
       const start = hasSludge ? [sludge.x + sludge.w, sludge.y + 50] : bottomPort;
       const headerX = filter.x + basketAreaWidth / 2;
-      pipe('sludge-filter', hasSludge ? sludge.id : coag.id, filter.id, hasSludge
+      pipe('sludge-filter', hasSludge ? sludge.id : coag.id, directSingleBasket ? `${filter.id}-B01` : filter.id, hasSludge
         ? [start, [filter.x - 65, start[1]], [filter.x - 65, filter.y - 27], [headerX, filter.y - 27], [headerX, filter.y]]
-        : [start, [start[0], lowerY - 27], [headerX, lowerY - 27], [headerX, filter.y]]);
+        : directSingleBasket ? [start, [headerX, filter.y + 96]]
+          : [start, [start[0], lowerY - 27], [headerX, lowerY - 27], [headerX, filter.y]]);
       pieces.push(`<g data-equipment="${filter.id}">`);
       pieces.push(`<path d="M${filter.x},${filter.y + 90} V${filter.y + filter.h} H${filter.x + filter.w} V${filter.y + 90}" data-part="filter-receiver" stroke-width="1.8"/>`);
       // A common header feeds one basket per selected branch, all within one receiver.
       // Basket spacing is schematic; valve specifications and actual dimensions remain unspecified.
-      line(filter.x + 60, filter.y, filter.x + 60 + (basketCount - 1) * 90, filter.y, 'data-part="filter-header" stroke-width="2.4"');
+      if (!directSingleBasket) line(filter.x + 60, filter.y, filter.x + 60 + (basketCount - 1) * 90, filter.y, 'data-part="filter-header" stroke-width="2.4"');
       for (let i = 0; i < basketCount; i++) {
         const cx = filter.x + 60 + i * 90, top = filter.y + 108, bottom = top + 80;
         const tag = `${filter.id}-B${String(i + 1).padStart(2, '0')}`;
@@ -316,8 +318,10 @@
         pieces.push(`<ellipse cx="${cx}" cy="${top}" rx="30" ry="8" fill="white"/>`);
         text(cx, bottom + 22, `カゴ${i + 1}`, 12, 'middle');
         pieces.push('</g>');
-        pipe(`filter-branch-${i + 1}`, filter.id, tag, [[cx, filter.y], [cx, top - 12]]);
-        pieces.push(`<circle cx="${cx}" cy="${filter.y}" r="3" fill="#20252b" stroke="none"/>`);
+        if (!directSingleBasket) {
+          pipe(`filter-branch-${i + 1}`, filter.id, tag, [[cx, filter.y], [cx, top - 12]]);
+          pieces.push(`<circle cx="${cx}" cy="${filter.y}" r="3" fill="#20252b" stroke="none"/>`);
+        }
       }
       pieces.push('</g>');
       probes.filter(probe => probe.tank.id === filter.id).forEach((probe, i) =>
