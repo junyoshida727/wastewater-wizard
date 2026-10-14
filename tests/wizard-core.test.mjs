@@ -82,6 +82,40 @@ test('legacy ambiguous hazardous value is migrated without claiming absence', ()
   assert.equal(data.ph_max, '5');
 });
 
+test('equipment exclusions survive drafts without losing specifications or disabling mandatory equipment', () => {
+  const data = core.normalizeData({ excluded_equipment: ['transfer:raw', 'PH:凝集沈殿槽', 'valve:sludge',
+    'transfer:raw', 'mixer:reactor', 'LS:凝集沈殿槽', '__proto__', 'unknown'],
+    equipment_specs: { 'transfer:raw': { maker: '保存メーカー', model: 'P-100', amp: '-1' } } });
+  assert.deepEqual(plain(data.excluded_equipment), ['transfer:raw', 'PH:凝集沈殿槽', 'valve:sludge']);
+  const restored = core.normalizeData(JSON.parse(JSON.stringify(data)));
+  const rows = core.getQuoteEquipment(restored);
+  assert.ok(rows.some(row => row.key === 'mixer:reactor'));
+  assert.ok(rows.some(row => row.key === 'LS:凝集沈殿槽'));
+  for (const key of restored.excluded_equipment) assert.ok(!rows.some(row => row.key === key));
+  assert.equal(core.validateData(restored).errors.length, 0, 'unused electrical ratings do not block output');
+  const removed = core.getQuoteEquipment(restored, { includeRemoved: true }).find(row => row.key === 'transfer:raw');
+  assert.equal(removed.removed, true);
+  assert.equal(removed.spec.model, 'P-100');
+  restored.excluded_equipment = [];
+  assert.equal(core.getQuoteEquipment(restored).find(row => row.key === 'transfer:raw').spec.maker, '保存メーカー');
+  assert.ok(core.validateData(restored).errors.some(error => error.includes('定格電流')));
+  assert.equal(core.getQuoteEquipment(core.normalizeData({})).length, core.getQuoteEquipment(core.createInitialData()).length);
+});
+
+test('excluded relay and branch valves keep their roles when the process configuration changes', () => {
+  const data = core.normalizeData({ option_tanks: ['中継槽'], filter_branches: '5分岐',
+    excluded_equipment: ['transfer:relay', 'valve:filter:2'] });
+  assert.ok(!core.getQuoteEquipment(data).some(row => row.tag === 'TP-02' || row.tag === 'MV-5'));
+  assert.ok(core.getQuoteEquipment(data).some(row => row.tag === 'MV-6'));
+  data.option_tanks = [];
+  data.filter_branches = '分岐なし';
+  const restored = core.normalizeData(JSON.parse(JSON.stringify(data)));
+  restored.option_tanks = ['中継槽'];
+  restored.filter_branches = '5分岐';
+  assert.ok(!core.getQuoteEquipment(restored).some(row => row.tag === 'TP-02' || row.tag === 'MV-5'));
+  assert.ok(core.getQuoteEquipment(restored).some(row => row.tag === 'MV-6'));
+});
+
 test('draft normalization ignores fields outside the supported schema', () => {
   const data = core.normalizeData({ customer_name: 'テスト株式会社', unsupported_field: 'ignore' });
   assert.equal(data.customer_name, 'テスト株式会社');

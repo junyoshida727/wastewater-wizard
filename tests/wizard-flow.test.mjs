@@ -9,6 +9,42 @@ vm.runInNewContext(readFileSync('wizard-flow.js', 'utf8'), context);
 const build = overrides => context.WizardFlow.build(context.WizardCore.normalizeData(overrides));
 const edges = svg => [...svg.matchAll(/data-pipe="([^"]+)" data-from="([^"]+)" data-to="([^"]+)"/g)].map(([, id, from, to]) => ({ id, from, to }));
 
+const removableEquipment = [
+  ['transfer:raw', 'TP-01'], ['transfer:relay', 'TP-02'], ['PH:凝集沈殿槽', 'PH-1'],
+  ['valve:supernatant', 'MV-1'], ['valve:sludge', 'MV-2'],
+  ...Array.from({length: 5}, (_, i) => [`valve:filter:${i}`, `MV-${i + 3}`])
+];
+
+for (const [key, tag] of removableEquipment) {
+  test(`removing ${key} removes its symbol and schedule entry but preserves every pipe`, () => {
+    const data = { option_tanks: ['中継槽', '監視槽', '汚泥貯槽'], filter_branches: '5分岐',
+      option_ph_tanks: ['中継槽', '監視槽', '汚泥貯槽'] };
+    const original = build(data);
+    const svg = build({ ...data, excluded_equipment: [key] });
+    assert.doesNotMatch(svg, new RegExp(`data-equipment="${tag}"|>${tag}</text>`));
+    const pipes = markup => [...markup.matchAll(/<path data-pipe="[^"]+"[^>]*\/>/g)].map(m => m[0]);
+    assert.deepEqual(pipes(svg), pipes(original));
+    const tags = markup => [...markup.matchAll(/data-equipment="([^"]+)"/g)].map(m => m[1]).sort();
+    assert.deepEqual(tags(svg), tags(original).filter(value => value !== tag));
+    assert.match(svg, /data-part="motor"/);
+    assert.match(svg, /data-equipment="LS-1"/);
+  });
+}
+
+test('removing all optional standard devices leaves the mandatory mixer, level sensor and continuous single-basket flow', () => {
+  const excluded_equipment = removableEquipment.map(([key]) => key);
+  const svg = build({ filter_branches: '分岐なし', excluded_equipment });
+  for (const [, tag] of removableEquipment) assert.doesNotMatch(svg, new RegExp(`data-equipment="${tag}"|>${tag}</text>`));
+  assert.match(svg, /data-part="motor"/);
+  assert.match(svg, /data-equipment="LS-1"/);
+  assert.match(svg, /data-pipe="sludge-filter" data-from="TK-02" data-to="FL-01-B01"/);
+  assert.doesNotMatch(svg, /pH計・液位検出は凝集沈殿槽に標準表示/);
+  const restored = build({ filter_branches: '分岐なし', excluded_equipment: [] });
+  assert.match(restored, /data-equipment="TP-01"/);
+  assert.match(restored, /data-equipment="PH-1"/);
+  assert.match(restored, /data-equipment="MV-2"/);
+});
+
 test('engineering SVG is self-contained, accessible and has a schedule and title block', () => {
   const svg = build({ customer_name: 'サンプル工場', tank_capacity: '200L', daily_volume: '1.5', wastewater_type: '洗浄排水' });
   assert.match(svg, /role="img" aria-labelledby="ww-flow-title ww-flow-desc"/);
@@ -58,6 +94,49 @@ test('outlet and branch solenoid valves are inline circle-V symbols with matchin
         }), `${tag} lies within its pipe segment`);
         assert.equal([...svg.matchAll(new RegExp(`>${tag}</text>`, 'g'))].length, 2, 'tag appears on drawing and schedule');
       }
+    }
+  }
+});
+
+test('manual valves stay upstream of every outlet and branch solenoid with separate symbols and schedule tags', () => {
+  for (const [filter_branches, total] of [['2分岐', 4], ['3分岐', 5], ['4分岐', 6], ['5分岐', 7], ['分岐なし', 2], ['ろ過しない', 2], ['不明', 2], ['', 2]]) {
+    for (const option_tanks of [[], ['監視槽'], ['汚泥貯槽'], ['中継槽', '監視槽', '汚泥貯槽']]) {
+      const data = { filter_branches, option_tanks };
+      const svg = build(data);
+      const manual = markup => [...markup.matchAll(/<g data-equipment="(HV-\d+)" data-kind="manual-valve" data-on-pipe="([^"]+)">([\s\S]*?)<\/g>/g)];
+      assert.equal(manual(svg).length, total);
+      for (const [i, [, tag, routeId, body]] of manual(svg).entries()) {
+        assert.equal(tag, `HV-${i + 1}`);
+        assert.match(body, /data-part="manual-valve-body"/);
+        assert.match(body, /data-part="manual-valve-handle"/);
+        assert.doesNotMatch(body, /<circle|>V<\/text>/);
+        const [, rotation, x, y] = body.match(/transform="rotate\((-?\d+) ([\d.]+) ([\d.]+)\)"/).map(Number);
+        const motor = svg.match(new RegExp(`<g data-equipment="MV-${i + 1}" data-kind="solenoid-valve" data-on-pipe="${routeId}"><circle cx="([\\d.]+)" cy="([\\d.]+)" r="([\\d.]+)"`)).slice(1).map(Number);
+        const [mx, my, radius] = motor;
+        if (rotation === 0) {
+          assert.equal(y, my);
+          assert.ok(x + 12 < mx - radius, 'horizontal manual valve is upstream and separate');
+        } else {
+          assert.equal(x, mx);
+          assert.ok(y + 12 < my - radius, 'vertical manual valve is upstream and separate');
+        }
+        const path = svg.match(new RegExp(`data-pipe="${routeId}"[^>]* d="([^"]+)"`))[1];
+        const points = [...path.matchAll(/[ML]([\d.]+),([\d.]+)/g)].map(m => m.slice(1).map(Number));
+        assert.ok(points.slice(1).some(([x2, y2], n) => {
+          const [x1, y1] = points[n];
+          const clearance = n === points.length - 2 ? 14 : 2;
+          return rotation === 0
+            ? y1 === y2 && y === y1 && x - 12 > x1 && mx + radius < x2 - clearance
+            : x1 === x2 && x === x1 && y - 12 > y1 && my + radius < y2 - clearance;
+        }), `${tag} and its solenoid fit on their pipe, clear of endpoints and arrows`);
+        assert.equal([...svg.matchAll(new RegExp(`>${tag}</text>`, 'g'))].length, 2);
+        assert.match(svg, new RegExp(`>${tag}</text><text[^>]+>手動バルブ</text>`));
+      }
+      const withoutSolenoids = build({ ...data, excluded_equipment: removableEquipment.map(([key]) => key) });
+      assert.deepEqual(manual(withoutSolenoids).map(match => match[0]), manual(svg).map(match => match[0]), 'manual valves are unchanged when solenoids are removed');
+      assert.doesNotMatch(withoutSolenoids, /data-kind="solenoid-valve"/);
+      assert.match(withoutSolenoids, /手動バルブは電磁弁の有無にかかわらず設置/);
+      assert.ok(!context.WizardCore.getQuoteEquipment(context.WizardCore.normalizeData(data)).some(row => row.tag.startsWith('HV-')), 'manual valves do not enter the electrical quote');
     }
   }
 });
