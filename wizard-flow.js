@@ -9,6 +9,7 @@
   function build(d, options = {}) {
     const prefix = String(options.idPrefix || 'ww-flow').replace(/[^a-zA-Z0-9_-]/g, '-') || 'ww-flow';
     const selected = (field, name) => list(d[field]).includes(name);
+    const enabled = key => root.WizardCore.isEquipmentEnabled(d, key);
     const { hasRelay, hasMonitor, hasSludge, basketCount, filterConfigured } = root.WizardCore.getProcessConfig(d);
     const powder = d.powder_feeder === '使用する';
     const chemicals = list(d.chemicals).filter(name => !(powder && name === '液体凝集剤'));
@@ -67,17 +68,23 @@
     const probes = probeTypes.flatMap(type => [coag, ...tanks.filter(tank => tank !== coag)]
       .filter(tank => (tank === coag && type.label !== 'TU') || selected(type.field, tank.name))
       .map((tank, i) => ({ ...type, tag: `${type.prefix}-${i + 1}`, tank,
-        detail: `${tank.name} / 1台${tank === coag && type.label !== 'TU' ? ' / 標準付属' : ''}` })));
+        detail: `${tank.name} / 1台${tank === coag && type.label !== 'TU' ? ' / 標準付属' : ''}` })))
+      .filter(probe => enabled(`${probe.prefix}:${probe.tank.name}`));
     const sludgePipe = hasSludge ? 'sludge-storage' : filterConfigured ? 'sludge-filter' : 'sludge-unconfirmed';
-    const valves = [
-      { tag: 'MV-1', pipe: hasMonitor ? 'supernatant-monitor' : 'supernatant-discharge', detail: '凝集沈殿槽 / 上澄液出口 / 1個', x: coag.x + coag.w + 55, y: 550, horizontal: true },
-      { tag: 'MV-2', pipe: sludgePipe, detail: '凝集沈殿槽 / 汚泥出口 / 1個', x: coag.x + coag.w / 2, y: coag.y + coag.h + 28 },
-      // With no split, only the tank outlet valve is needed; each split gets its own valve.
+    const valveLocations = [
+      { key: 'valve:supernatant', tag: 'MV-1', pipe: hasMonitor ? 'supernatant-monitor' : 'supernatant-discharge', detail: '凝集沈殿槽 / 上澄液出口 / 1個', x: coag.x + coag.w + 76, y: 550, horizontal: true },
+      { key: 'valve:sludge', tag: 'MV-2', pipe: sludgePipe, detail: '凝集沈殿槽 / 汚泥出口 / 1個', x: coag.x + coag.w / 2, y: coag.y + coag.h + 70 },
+      // With no split, valve pairs are only needed at tank outlets.
       ...Array.from({ length: basketCount > 1 ? basketCount : 0 }, (_, i) => ({
-        tag: `MV-${i + 3}`, pipe: `filter-branch-${i + 1}`, detail: `ろ過分岐${i + 1} / カゴ${i + 1}手前 / 1個`,
-        x: filter.x + 60 + i * 90, y: filter.y + 44
+        key: `valve:filter:${i}`, tag: `MV-${i + 3}`, pipe: `filter-branch-${i + 1}`, detail: `ろ過分岐${i + 1} / カゴ${i + 1}手前 / 1個`,
+        x: filter.x + 60 + i * 90, y: filter.y + 64
       }))
     ];
+    // Manual isolation valves remain even when the electrical device is omitted.
+    const manualValves = valveLocations.map((valve, i) => ({ ...valve, tag: `HV-${i + 1}`,
+      x: valve.x - (valve.horizontal ? 48 : 0), y: valve.y - (valve.horizontal ? 0 : 42)
+    }));
+    const valves = valveLocations.filter(valve => enabled(valve.key));
     const placement = item => {
       if (String(item.count ?? '').trim() !== '' && Number(item.count) === 0) return '図示なし';
       if (!['ポンプ', '攪拌機', 'その他'].includes(item.kind)) return '種別未指定 / 設置槽：' + (item.tank || '未指定');
@@ -93,13 +100,14 @@
       ['-', '排水の種類・内容', d.wastewater_type || '未入力'],
       [raw.id, raw.name, d.raw_tank === 'あり' ? (d.raw_tank_size ? `${d.raw_tank_size} m³ / 既設` : '既設 / 容量未入力') : d.raw_tank === 'なし' ? '未設置 / 要検討' : '有無未確認'],
       [coag.id, coag.name, d.tank_capacity || '容量未選択'],
-      ['TP-01', '原水移送ポンプ', `1台 / 標準付属 / 原水槽 → ${hasRelay ? '中継槽' : '凝集沈殿槽'}`],
-      ...(hasRelay ? [['TP-02', '中継移送ポンプ', '1台 / 中継槽追加分 / 中継槽 → 凝集沈殿槽']] : []),
+      ...(enabled('transfer:raw') ? [['TP-01', '原水移送ポンプ', `1台 / 標準付属 / 原水槽 → ${hasRelay ? '中継槽' : '凝集沈殿槽'}`]] : []),
+      ...(hasRelay && enabled('transfer:relay') ? [['TP-02', '中継移送ポンプ', '1台 / 中継槽追加分 / 中継槽 → 凝集沈殿槽']] : []),
       ...(hasRelay ? [[relay.id, relay.name, '選択あり / 容量未確定']] : []),
       ...(hasSludge ? [[sludge.id, sludge.name, '選択あり / 容量未確定']] : []),
       ...(hasMonitor ? [[monitor.id, monitor.name, '選択あり / 容量未確定']] : []),
       ...(filterConfigured ? [[filter.id, filter.name, `${d.filter_branches} / カゴ${basketCount}個 / 共通のろ過受け槽`]] : []),
       ...valves.map(valve => [valve.tag, '電磁バルブ', valve.detail]),
+      ...manualValves.map(valve => [valve.tag, '手動バルブ', valve.detail]),
       ...probes.map(probe => [probe.tag, probe.name, probe.detail]),
       ...list(d.level_sensors).filter(name => !tanks.some(tank => tank.name === name))
         .map(name => ['-', 'レベルセンサー（構成外）', `${name} / 1台 / 設置先要確認・図示なし`]),
@@ -167,6 +175,10 @@
       pieces.push(`<circle cx="${cx}" cy="${cy}" r="${radius}" fill="white"/>`);
       text(cx, cy + 5, 'P', 16, 'middle');
     };
+    const manualValveSymbol = (cx, cy, horizontal = false) => {
+      pieces.push(`<path data-part="manual-valve-body" d="M${cx - 12},${cy - 8} L${cx + 12},${cy + 8} V${cy - 8} L${cx - 12},${cy + 8} Z" fill="white" transform="rotate(${horizontal ? 0 : -90} ${cx} ${cy})"/>`);
+      pieces.push(`<path data-part="manual-valve-handle" d="M${cx},${cy} V${cy - 21} M${cx - 7},${cy - 21} H${cx + 7}" transform="rotate(${horizontal ? 0 : -90} ${cx} ${cy})"/>`);
+    };
     const mixerSymbol = (cx, motorY, bladeY, bladeX = cx) => {
       pieces.push(`<circle data-part="motor" cx="${cx}" cy="${motorY}" r="18" fill="white"/>`);
       text(cx, motorY + 6, 'M', 17, 'middle');
@@ -197,15 +209,18 @@
     };
     const transferPump = (source, target, id, edge) => {
       const cx = source.x + 45, cy = source.y + 95;
+      const showPump = enabled(source === raw ? 'transfer:raw' : 'transfer:relay');
       // A single horizontal run clears both open rims and stays below source instruments.
       // Extend the final drop into the vessel so its arrow remains clear without a short jog.
       const routeY = Math.min(source.y - 15, target.y - 2);
-      pieces.push(`<g data-equipment="${id}" data-tank="${source.id}" data-kind="transfer-pump">`);
+      if (showPump) pieces.push(`<g data-equipment="${id}" data-tank="${source.id}" data-kind="transfer-pump">`);
       // Rise inside the source vessel and cross its side only above the open top.
       pipe(edge, source.id, target.id, [[cx, cy - 15], [cx, routeY], [target.x + 18, routeY], [target.x + 18, target.y + 20]]);
-      pumpSymbol(cx, cy);
-      text(cx, cy + 31, id, 12, 'middle');
-      pieces.push('</g>');
+      if (showPump) {
+        pumpSymbol(cx, cy);
+        text(cx, cy + 31, id, 12, 'middle');
+        pieces.push('</g>');
+      }
     };
     const drawTank = (tank, detail, dashed = false, conical = false) => {
       pieces.push(`<g data-equipment="${tank.id}" ${dashed ? 'stroke-dasharray="6 4"' : ''}>`);
@@ -243,6 +258,8 @@
     text(375, 137, '薬品投入（各別配管）', 12);
     line(580, 132, 630, 132, `stroke-width="1.5" marker-end="url(#${prefix}-arrow)"`);
     text(640, 137, '粉体投入', 12);
+    manualValveSymbol(850, 132, true);
+    text(875, 137, '手動バルブ（HV）', 12);
     text(54, 160, 'P：ポンプ  /  M：撹拌機  /  V：電磁バルブ（MV）  /  pH：pH計（PH）  /  TU：濁度計  /  LS：液位検出', 12);
     text(54, 179, '破線の槽：有無・設置を要確認。線の交差部は接続なし。', 12);
 
@@ -282,7 +299,7 @@
       pipe('supernatant-monitor', coag.id, monitor.id, [[coag.x + coag.w, 550], [monitor.x, 550]]);
       pipe('supernatant-discharge', monitor.id, '放流', [[monitor.x + monitor.w, 550], [upperEnd, 550]]);
     } else pipe('supernatant-discharge', coag.id, '放流', [[coag.x + coag.w, 550], [upperEnd, 550]]);
-    text(coag.x + coag.w + 16, 532, '上澄液', 14);
+    text(coag.x + coag.w + 16, 510, '上澄液', 14);
     text(upperEnd, 578, '放流', 15, 'end');
     multiline(upperEnd, 598, d.discharge_dest || '放流先未確認', 12, 12, 'end');
     drawTank(raw, d.raw_tank === 'あり' ? `${d.raw_tank_size || '?'} m³ / 既設` : '有無・設置要確認', d.raw_tank !== 'あり');
@@ -336,11 +353,17 @@
       text(bottomPort[0], lowerY + 55, d.filter_branches === 'ろ過しない' ? 'ろ過なし' : 'ろ過条件未確認', 15, 'middle');
       text(bottomPort[0], lowerY + 81, '汚泥処理方法を確認', 13, 'middle');
     }
-    text(coag.x + coag.w / 2 + 16, bottomPort[1] + 65, '汚泥', 14);
+    text(coag.x + coag.w / 2 - 26, bottomPort[1] + 70, '汚泥', 14, 'end');
     if (hasSludge && !filterConfigured) {
       text(sludge.x + sludge.w / 2, sludge.y + sludge.h + 70, '後段の汚泥処理方法を確認', 12, 'middle');
     }
     // Overlay after pipes so each inline valve stays visible at its actual outlet/branch.
+    manualValves.forEach(valve => {
+      pieces.push(`<g data-equipment="${valve.tag}" data-kind="manual-valve" data-on-pipe="${valve.pipe}">`);
+      manualValveSymbol(valve.x, valve.y, valve.horizontal);
+      text(valve.x + (valve.horizontal ? 0 : 22), valve.y + (valve.horizontal ? 34 : 4), valve.tag, 12, valve.horizontal ? 'middle' : 'start');
+      pieces.push('</g>');
+    });
     valves.forEach(valve => {
       pieces.push(`<g data-equipment="${valve.tag}" data-kind="solenoid-valve" data-on-pipe="${valve.pipe}"><circle cx="${valve.x}" cy="${valve.y}" r="14" fill="white"/>`);
       text(valve.x, valve.y + 5, 'V', 16, 'middle');
@@ -360,9 +383,10 @@
       rowY += rowHeights[i];
     });
     line(tableX + 80, 142, tableX + 80, tableBottom);
-    text(tableX, tableBottom + 28, '電磁バルブ・計器：図面と一覧の番号が対応', 12);
-    text(tableX, tableBottom + 47, 'pH計・液位検出は凝集沈殿槽に標準表示。', 12);
+    text(tableX, tableBottom + 28, '電磁・手動バルブ・計器：図面と一覧の番号が対応', 12);
+    text(tableX, tableBottom + 47, enabled('PH:凝集沈殿槽') ? 'pH計・液位検出は凝集沈殿槽に標準表示。' : '液位検出は凝集沈殿槽に標準表示。', 12);
     text(tableX, tableBottom + 66, '追加機器は槽内に記号・台数で表示。', 12);
+    text(tableX, tableBottom + 85, '手動バルブは電磁弁の有無にかかわらず設置。', 12);
 
     line(24, footerY, width - 24, footerY);
     text(48, footerY + 25, '設計確認事項', 14, 'start', 'font-weight="600"');

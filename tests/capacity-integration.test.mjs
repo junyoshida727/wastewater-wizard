@@ -219,6 +219,51 @@ test('wastewater reuse is saved and included in the result and flow diagram', ()
   assert.match(restored.elements.get('result-flow').innerHTML, /再利用/);
 });
 
+test('equipment removal buttons persist to drafts, results and SVG downloads and restore saved ratings', async () => {
+  const click = (app, key, restore = false) => {
+    const container = app.elements.get(restore ? 'removed-equipment-fields' : 'quote-equipment-fields');
+    const action = restore ? 'restore' : 'remove';
+    const tag = [...container.innerHTML.matchAll(/<button\b[^>]*>/g)].find(([markup]) => markup.includes(`data-${action}-equipment="${key}"`));
+    assert.ok(tag, `${action} button exists for ${key}`);
+    const handler = tag[0].match(/onclick="([^"]+)"/)[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+    app.run(handler);
+  };
+  const app = loadWizard();
+  app.run(`setSalesValue('equipment','transfer:raw','maker','保存メーカー');
+    setSalesValue('equipment','transfer:raw','model','P-100'); renderSalesFields(true)`);
+  for (const key of ['mixer:reactor', 'LS:凝集沈殿槽']) {
+    assert.ok(!app.elements.get('quote-equipment-fields').innerHTML.includes(`data-remove-equipment="${key}"`));
+    app.run(`setEquipmentEnabled(${JSON.stringify(key)},false)`);
+    assert.equal(app.run('data.excluded_equipment.length'), 0);
+  }
+  for (const key of ['transfer:raw', 'PH:凝集沈殿槽', 'valve:supernatant', 'valve:sludge']) click(app, key);
+  assert.equal(app.elements.get('removed-equipment').hidden, false);
+  assert.match(app.elements.get('reactor-ph-status').textContent, /使用しない/);
+  const restored = loadWizard(app.storage);
+  restored.run('resumeDraft(); generateResult(); downloadFlowSVG()');
+  const outputs = [restored.elements.get('result-quote-equipment').innerHTML,
+    restored.elements.get('result-flow').innerHTML, await restored.downloads[0].text()];
+  for (const output of outputs) assert.doesNotMatch(output, /TP-01|PH-1|MV-1|MV-2/);
+  assert.doesNotMatch(outputs[0], /HV-\d|手動バルブ/);
+  for (const output of outputs.slice(1)) {
+    assert.match(output, /data-equipment="HV-1" data-kind="manual-valve"/);
+    assert.match(output, /data-equipment="HV-2" data-kind="manual-valve"/);
+  }
+  assert.doesNotMatch(restored.table.innerHTML, /pH計 設置槽/);
+  assert.match(restored.elements.get('result-quote-equipment').innerHTML, /本体攪拌機|レベルセンサー/);
+  for (const key of ['transfer:raw', 'PH:凝集沈殿槽', 'valve:supernatant', 'valve:sludge']) click(restored, key, true);
+  restored.run('generateResult()');
+  assert.match(restored.elements.get('result-quote-equipment').innerHTML, /保存メーカー/);
+  assert.match(restored.elements.get('result-quote-equipment').innerHTML, /P-100/);
+  assert.match(restored.elements.get('result-flow').innerHTML, /data-equipment="PH-1"/);
+  assert.equal(restored.elements.get('removed-equipment').hidden, true);
+  click(restored, 'transfer:raw');
+  restored.run('startNewDraft(true); renderSalesFields(true)');
+  assert.equal(restored.run('data.excluded_equipment.length'), 0);
+  assert.match(restored.elements.get('quote-equipment-fields').innerHTML, /data-quote-key="transfer:raw"/);
+  assert.equal(restored.elements.get('removed-equipment').hidden, true);
+});
+
 test('real input handlers recalculate and persist conditions; result/PDF uses identical calculations', () => {
   const app = loadWizard();
   app.fillCapacity();

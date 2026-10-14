@@ -1276,6 +1276,13 @@
   .sales-detail { border-bottom: 1px solid var(--border); padding: 12px 0; min-width: 0; }
   .sales-detail summary { cursor: pointer; font-size: 14px; overflow-wrap: anywhere; }
   .sales-detail summary span { display: block; margin: 5px 0 0 16px; color: var(--text2); font-size: 12px; }
+  .quote-equipment-row { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+  .quote-equipment-row > .sales-detail { flex: 1; min-width: 0; }
+  .equipment-action { flex: none; width: 32px; height: 32px; margin-top: 10px; padding: 0; border: 1px solid var(--border); border-radius: 4px; background: var(--surface2); color: var(--text2); cursor: pointer; }
+  .equipment-action:hover { color: var(--accent); border-color: var(--accent); }
+  .removed-equipment-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; font-size: 12px; }
+  .removed-equipment-row span { min-width: 0; overflow-wrap: anywhere; }
+  .removed-equipment-row .equipment-action { margin-top: 0; }
   .sales-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
   .sales-fields label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text2); min-width: 0; }
   .sales-fields input, .sales-fields select, .sales-fields textarea { width: 100%; min-width: 0; box-sizing: border-box; }
@@ -1792,7 +1799,7 @@
 
       <div class="field-group">
         <div class="field-label">pH計</div>
-        <div style="font-size:11px; color:var(--text3); margin-bottom:6px;">※凝集沈殿槽（本体）は標準装備。追加設置する槽を選択してください</div>
+        <div id="reactor-ph-status" style="font-size:11px; color:var(--text3); margin-bottom:6px;">凝集沈殿槽（本体）：使用する</div>
         <div class="check-grid" id="option_ph_tanks">
           <div class="check-item" onclick="toggleCheck('option_ph_tanks', '中継槽', this)"><div class="check-box"></div>中継槽</div>
           <div class="check-item" onclick="toggleCheck('option_ph_tanks', '汚泥貯槽', this)"><div class="check-box"></div>汚泥貯槽</div>
@@ -1846,7 +1853,7 @@
 
       <div class="field-group">
         <div class="field-label">追加ポンプ・攪拌機（標準付属以外）</div>
-        <div style="font-size:11px; color:var(--text3); margin-bottom:10px;">制御盤と連動が必要な機器を入力してください。既設の攪拌機・ポンプも含みます（原水移送ポンプ1台は標準付属。中継槽ありの場合は、原水槽→中継槽と中継槽→凝集沈殿槽の計2台を図示し、中継槽側の1台を追加分とします）</div>
+        <div style="font-size:11px; color:var(--text3); margin-bottom:10px;">制御盤と連動が必要な機器を入力してください。既設の攪拌機・ポンプも含みます。</div>
         <p class="equipment-help">設置槽を選ぶとフロー図の槽内に追加機器を表示します。台数は記号に併記します。追加ポンプの吐出先・配管接続は別途確認してください。図示済みの移送ポンプはここへの重複入力は不要です。</p>
         <div style="overflow-x:auto;">
         <table style="width:100%; min-width:320px; border-collapse:collapse; font-size:13px;" id="extra-pump-table">
@@ -1870,6 +1877,10 @@
       <section aria-labelledby="quote-equipment-heading">
         <h3 class="form-section-title" id="quote-equipment-heading">メーカー・型番・電気定格</h3>
         <div id="quote-equipment-fields"></div>
+        <details id="removed-equipment" class="sales-detail" hidden>
+          <summary>削除した機器</summary>
+          <div id="removed-equipment-fields"></div>
+        </details>
       </section>
 
       <div class="field-group">
@@ -2530,12 +2541,23 @@ function removeWaterComponent(name) {
   updateSummary();
 }
 
+function setEquipmentEnabled(key, enabled) {
+  if (!WizardCore.canRemoveEquipment(key)) return;
+  if (!WizardCore.getQuoteEquipment(data, { includeRemoved: true }).some(item => item.key === key)) return;
+  const excluded = new Set(data.excluded_equipment || []);
+  if (enabled) excluded.delete(key);
+  else excluded.add(key);
+  data.excluded_equipment = [...excluded];
+  updateSummary();
+}
+
 function renderSalesFields(force = false) {
-  const equipment = WizardCore.getQuoteEquipment(data);
+  const equipment = WizardCore.getQuoteEquipment(data, { includeRemoved: true });
   const names = WizardCore.getWaterAnalysisNames(data);
   const signature = JSON.stringify([names, equipment.map(({spec, ...item}) => item), data.legacy_notes]);
   if (!force && signature === salesSignature) return;
   salesSignature = signature;
+  document.getElementById('reactor-ph-status').textContent = '凝集沈殿槽（本体）：' + (WizardCore.isEquipmentEnabled(data, 'PH:凝集沈殿槽') ? '使用する' : '使用しない');
   document.getElementById('legacy-notes-section').hidden = !data.legacy_notes;
   document.getElementById('legacy-notes').textContent = data.legacy_notes;
   const standard = ['全リン', 'リン酸態リン', '全窒素', 'アンモニア性窒素', '界面活性剤', '溶剤', '塩類'];
@@ -2552,9 +2574,10 @@ function renderSalesFields(force = false) {
       ${salesField('water', name, 'note', '分析の備考', a.note)}
     </div></details>`;
   }).join('');
-  document.getElementById('quote-equipment-fields').innerHTML = equipment.map(item => {
+  document.getElementById('quote-equipment-fields').innerHTML = equipment.filter(item => !item.removed).map(item => {
     const s = item.spec;
-    return `<details class="sales-detail" data-quote-key="${escapeAttr(item.key)}"><summary>${escapeHtml(item.tag + ' / ' + item.name)}<span>${escapeHtml(item.tank || '設置場所未確認')} / ${escapeHtml(item.count || '台数未確認')}${item.count ? '台' : ''}</span></summary>
+    const removeLabel = escapeAttr(item.tag + ' ' + item.name + 'を削除');
+    return `<div class="quote-equipment-row"><details class="sales-detail" data-quote-key="${escapeAttr(item.key)}"><summary>${escapeHtml(item.tag + ' / ' + item.name)}<span>${escapeHtml(item.tank || '設置場所未確認')} / ${escapeHtml(item.count || '台数未確認')}${item.count ? '台' : ''}</span></summary>
       <div class="sales-fields">
         ${salesField('equipment', item.key, 'maker', 'メーカー', s.maker)}
         ${salesField('equipment', item.key, 'model', '型番', s.model)}
@@ -2566,7 +2589,13 @@ function renderSalesFields(force = false) {
         ${item.legacyPower ? `<p class="wide">旧入力の容量：${escapeHtml(item.legacyPower)} kW（定格出力との対応は未確認）</p>` : ''}
         ${s.power !== '' ? `<p class="wide">旧入力の消費電力：${escapeHtml(s.power)} ${escapeHtml(s.power_unit || 'kW')}／台</p>` : ''}
         ${salesField('equipment', item.key, 'note', '機器の備考', s.note)}
-      </div></details>`;
+      </div></details>${WizardCore.canRemoveEquipment(item.key) ? `<button type="button" class="equipment-action" data-remove-equipment="${escapeAttr(item.key)}" title="${removeLabel}" aria-label="${removeLabel}" onclick="${escapeAttr(`setEquipmentEnabled(${JSON.stringify(item.key)},false)`)}">&#10005;</button>` : ''}</div>`;
+  }).join('');
+  const removed = equipment.filter(item => item.removed);
+  document.getElementById('removed-equipment').hidden = removed.length === 0;
+  document.getElementById('removed-equipment-fields').innerHTML = removed.map(item => {
+    const label = escapeAttr(item.tag + ' ' + item.name + 'を戻す');
+    return `<div class="removed-equipment-row"><span>${escapeHtml(item.tag + ' / ' + item.name + ' / ' + item.tank)}</span><button type="button" class="equipment-action" data-restore-equipment="${escapeAttr(item.key)}" title="${label}" aria-label="${label}" onclick="${escapeAttr(`setEquipmentEnabled(${JSON.stringify(item.key)},true)`)}">&#8630;</button></div>`;
   }).join('');
 }
 
@@ -3144,7 +3173,7 @@ function generateResult() {
     ['放流先', data.discharge_dest],
     ['排水基準の把握', data.regulation_status],
     ['オプション（槽）', (data.option_tanks||[]).join('、')],
-    ['pH計 設置槽', (data.option_ph_tanks||[]).length > 0 ? '凝集沈殿槽（標準）' + ((data.option_ph_tanks||[]).length > 0 ? '、' + (data.option_ph_tanks||[]).join('、') : '') : '凝集沈殿槽（標準）'],
+    ['pH計 設置槽', [...(WizardCore.isEquipmentEnabled(data, 'PH:凝集沈殿槽') ? ['凝集沈殿槽（標準）'] : []), ...(data.option_ph_tanks || [])].join('、')],
     ['濁度計 設置槽', (data.option_turbidity_tanks||[]).join('、')],
     ['脱水機', data.option_dehydrator + (data.option_dehydrator === '必要' && (data.dehydrator_maker || data.dehydrator_model) ? '（' + [data.dehydrator_maker, data.dehydrator_model].filter(Boolean).join(' ') + '）' : '')],
     ['原水槽', data.raw_tank ? data.raw_tank + (data.raw_tank === 'あり' && data.raw_tank_size ? '（' + data.raw_tank_size + ' m³）' : '') : ''],

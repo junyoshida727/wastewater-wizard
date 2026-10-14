@@ -3,11 +3,11 @@
 
   const ARRAY_FIELDS = [
     'chemicals', 'metals', 'hazardous', 'other_contam', 'option_tanks',
-    'option_ph_tanks', 'option_turbidity_tanks', 'level_sensors', 'carry_in', 'access', 'water_components'
+    'option_ph_tanks', 'option_turbidity_tanks', 'level_sensors', 'carry_in', 'access', 'water_components', 'excluded_equipment'
   ];
 
   const DEFAULT_DATA = {
-    hearing_version: '3', legacy_notes: '', water_components: [], water_analysis: {}, equipment_specs: {},
+    hearing_version: '3', legacy_notes: '', water_components: [], water_analysis: {}, equipment_specs: {}, excluded_equipment: [],
     customer_name: '', desired_delivery: '', staff_name: '',
     install_type: '', delivery_pref: '', delivery_city: '',
     industry: '', wastewater_type: '', daily_volume: '', working_days: '', batch_count: '',
@@ -44,6 +44,18 @@
 
   const EQUIPMENT_KINDS = ['ポンプ', '攪拌機', 'その他'];
   const EQUIPMENT_TANKS = ['原水槽', '凝集沈殿槽', '中継槽', '汚泥貯槽', '監視槽', 'ろ過受け槽'];
+  const REMOVABLE_EQUIPMENT = new Set([
+    'transfer:raw', 'transfer:relay', 'PH:凝集沈殿槽', 'valve:supernatant', 'valve:sludge',
+    ...Array.from({length: 5}, (_, i) => `valve:filter:${i}`)
+  ]);
+
+  function canRemoveEquipment(key) {
+    return REMOVABLE_EQUIPMENT.has(key);
+  }
+
+  function isEquipmentEnabled(data, key) {
+    return !canRemoveEquipment(key) || !asArray(data.excluded_equipment).includes(key);
+  }
 
   function getProcessConfig(data) {
     const tanks = asArray(data.option_tanks);
@@ -72,6 +84,7 @@
     ARRAY_FIELDS.forEach((field) => {
       normalized[field] = asArray(source[field]);
     });
+    normalized.excluded_equipment = [...new Set(normalized.excluded_equipment.filter(canRemoveEquipment))];
     // Keep deleted row placeholders while the wizard is open. The DOM uses the
     // original row index for subsequent edits, so compacting this array corrupts data.
     normalized.extra_pumps = Array.isArray(source.extra_pumps)
@@ -116,10 +129,10 @@
   }
 
   // Keys identify physical roles, never their current position in a drawing or list.
-  function getQuoteEquipment(data) {
+  function getQuoteEquipment(data, { includeRemoved = false } = {}) {
     const rows = [];
     const add = (key, tag, name, tank, count = '1', legacy = {}) => rows.push({
-      key, tag, name, tank, count, legacyPower: asString(legacy.lph),
+      key, tag, name, tank, count, removed: !isEquipmentEnabled(data, key), legacyPower: asString(legacy.lph),
       spec: { maker: '', model: '', output_kw: '', amp: asString(legacy.amp), voltage: '', phase: '', power: '', power_unit: 'kW', frequency: '', note: '',
         ...(data.equipment_specs?.[key] || {}) }
     });
@@ -153,7 +166,7 @@
       const prefix = item.kind === '攪拌機' ? 'AM' : item.kind === 'その他' ? 'AE' : 'AP';
       add(`extra:${item.id || `legacy-extra-${index}`}`, `${prefix}-${String(number).padStart(2, '0')}`, item.name || item.kind || '追加機器', item.tank, item.count, item);
     });
-    return rows;
+    return rows.filter(item => includeRemoved || !item.removed);
   }
 
   function getOtherChemicalKeys(data) {
@@ -345,6 +358,8 @@
     getProcessConfig,
     getWaterAnalysisNames,
     getQuoteEquipment,
+    canRemoveEquipment,
+    isEquipmentEnabled,
     createInitialData,
     normalizeData,
     getOtherChemicalKeys,
